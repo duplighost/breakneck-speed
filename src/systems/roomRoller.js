@@ -1,7 +1,8 @@
 // THE generator. Deals one card per axis from no-repeat bags, cross-checks the
 // axes, builds the room object, and bakes its background once. Consumes only
 // data/ + rng (architecture.md §4 rule 2).
-import { ROOM, TAU } from '../config.js';
+import { ROOM, TAU, TIER_LIFT } from '../config.js';
+import { makeEnemy } from './enemies.js';
 import { Bag, clamp, dist, rand, randi, chance, pick, mulberry32, hashString } from '../rng.js';
 import { BIOMES, BIOMES_BY_TIER, tierForRound } from '../data/biomes.js';
 import { LAYOUTS, LAYOUT_IDS } from '../data/layouts.js';
@@ -250,6 +251,10 @@ export function rollRoom(run, round) {
   // ── secret #1: a straight dash-run through the clouds to a power gem. Only a DASH
   // punches through the cloud gates; the prize sits in a sealed pocket at the far end. ──
   if (!bossId) seedCloudRun(room, rng, px, py, portalX, portalY);
+
+  // ── secret #2: the SKYWAY — grind a rail off a rooftop, off the map, into open sky;
+  // dash the sentinel gauntlet and grab the jackpot jewel at the apex. ──
+  if (!bossId && room.tiers.length) seedSkyway(room, rng, px, py, portalX, portalY);
 
   // ── axis 3: hazard kit ──
   seedHazards(room, rng);
@@ -1377,6 +1382,53 @@ function seedCloudRun(room, rng, px, py, portalX, portalY) {
   return false;
 }
 
+// ── Skyway: a grind rail that launches off a rooftop, OFF THE MAP, and climbs into open
+// sky. A gauntlet of turret sentinels lines the off-map stretch (dash through them for
+// iframes + the rocket cut), and a flashy jackpot jewel waits at the apex. You ride out,
+// clear the rail, grab the jewel, and the grind bounces you back into the city. Built on
+// the sky-rail ride (player.updateSkyRailRide handles the skyway branch). ──
+function seedSkyway(room, rng, px, py, portalX, portalY) {
+  if (room.bossId) return false;
+  if (!chance(rng, room.round >= 2 ? 0.5 : 0.32)) return false;
+  const tiers = room.tiers || [];
+  if (!tiers.length) return false;
+  const cx = room.w / 2, cy = room.h / 2;
+  // launch from a TALL roof out near a city edge so the rail shoots cleanly off the map.
+  const cands = tiers
+    .map(t => ({ t, edge: Math.max(Math.abs(t.x + t.w / 2 - cx) / cx, Math.abs(t.y + t.h / 2 - cy) / cy), rise: t.rise || 1 }))
+    .filter(o => o.edge > 0.32)
+    .sort((a, b) => (b.edge * 0.6 + b.rise * 0.4) - (a.edge * 0.6 + a.rise * 0.4));
+  const pickT = (cands[0] || { t: tiers[0] }).t;
+  const lx = pickT.x + pickT.w / 2, ly = pickT.y + pickT.h / 2;
+  // outward = away from centre, biased onto the dominant axis for a clean exit off one side
+  let dx = lx - cx, dy = ly - cy; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+  if (Math.abs(dx) >= Math.abs(dy)) dy *= 0.42; else dx *= 0.42;
+  const dn = Math.hypot(dx, dy) || 1; dx /= dn; dy /= dn;
+  const length = rand(rng, 2700, 3500);
+  const ex = lx + dx * length, ey = ly + dy * length;      // off-map apex (the jewel)
+  const liftStart = TIER_LIFT * (pickT.rise || 1);
+  const liftEnd = liftStart + rand(rng, 480, 740);          // climbs high into the sky
+  const color = '#9fe8ff';
+  const rail = {
+    x1: lx, y1: ly, x2: ex, y2: ey, level: 1, width: 66, boost: 2550,
+    rise: pickT.rise || 1, skyway: true, bow: 0, twists: 0,
+    liftStart, liftEnd, color, phase: rng() * TAU,
+  };
+  (room.skyRails = room.skyRails || []).push(rail);
+  // turret sentinels along the off-map stretch (auto-dormant: turrets only fire within 980px)
+  const n = randi(rng, 3, 5);
+  for (let i = 0; i < n; i++) {
+    const u = 0.34 + (n > 1 ? (i / (n - 1)) * 0.54 : 0);
+    const e = makeEnemy('turret', lx + (ex - lx) * u, ly + (ey - ly) * u, room);
+    e.level = 1; e.skyway = true; e.skyU = u;
+    e.hp *= 0.7; e.maxHp = e.hp;
+    room.enemies.push(e);
+  }
+  room.skyway = { rail, launch: { x: lx, y: ly, lift: liftStart }, jewel: { x: ex, y: ey, lift: liftEnd }, color, taken: false };
+  room.landmarks.push({ kind: 'skyway', x: lx, y: ly });
+  return true;
+}
+
 // ── Neon districts + flow lanes (ported from ChatGPT's "neon districts" build) ──
 // Districts are big NON-COLLIDING city slabs baked under the fight (the sprawl reads
 // as a place, not added collision). Flow lanes are wide boost boulevards that speed
@@ -1547,9 +1599,11 @@ function retargetFlowLanes(room, rng, px, py, portalX, portalY) {
   for (const v of room.vents || []) addPoint(v.x, v.y, v.kind === 'dropfan' ? 'dropfan' : 'vent', v.kind === 'dropfan' ? 'DROP' : 'ROOF', 3.6 + (v.toLevel || 0), v.fromLevel || 0);
   for (const t of room.tiers || []) addPoint(t.ramp?.x || (t.x + t.w / 2), t.y + t.h, 'ramp', 'ROOF', 3.2, 0);
   for (const l of room.landmarks || []) {
-    const val = l.kind === 'skyCache' || l.kind === 'mysteryVault' || l.kind === 'undervault' ? 5.2
+    const val = l.kind === 'skyway' ? 5.8
+      : l.kind === 'skyCache' || l.kind === 'mysteryVault' || l.kind === 'undervault' ? 5.2
       : l.kind === 'dashBell' ? 4.4 : l.kind === 'highGround' ? 3.8 : l.kind === 'vent' ? 3.6 : 2.2;
-    if (val >= 3.2) addPoint(l.x, l.y, l.kind, l.kind === 'dashBell' ? 'DASH' : l.kind === 'skyCache' ? 'CACHE' : 'GO', val);
+    const label = l.kind === 'dashBell' ? 'DASH' : l.kind === 'skyCache' ? 'CACHE' : l.kind === 'skyway' ? 'SKY' : 'GO';
+    if (val >= 3.2) addPoint(l.x, l.y, l.kind, label, val);
   }
   room.waypoints = points;
   const lanes = room.flowLanes || [];

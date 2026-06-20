@@ -3,7 +3,11 @@
 
 export const TAU = Math.PI * 2;
 export const SAVE_KEY = 'oneRoomNoMoon.v1';
-export const VERSION = '2.4.0-breakneck-skyline';
+export const VERSION = '2.5.0-breakneck-skyline';
+
+// px a platform (level 1) rises; per-building height = TIER_LIFT * tier.rise. Shared by
+// the generator (roomRoller) and the renderer (draw) so building heights stay in sync.
+export const TIER_LIFT = 112;
 
 export const ROOM = {
   W: 2050, H: 1460, H_PORTRAIT: 1820,   // base dims (the roller rolls actual sizes; these document the target)

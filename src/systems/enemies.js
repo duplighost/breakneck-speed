@@ -208,11 +208,15 @@ export function updateEnemies(room, dt) {
     }
 
     e.x += e.vx * dt; e.y += e.vy * dt;
-    const w = room.wall - 22;
-    e.x = clamp(e.x, w + e.r, room.w - w - e.r);
-    e.y = clamp(e.y, w + e.r, room.h - w - e.r);
-    for (const o of room.obstacles) if (!o.gone) resolveCircleObstacle(e, o);
-    e.level = levelAt(room, e.x, e.y);
+    if (e.skyway) {
+      e.level = 1; // off-map sky sentinels stay on the rail at roof level (no bounds clamp / no floor relevel)
+    } else {
+      const w = room.wall - 22;
+      e.x = clamp(e.x, w + e.r, room.w - w - e.r);
+      e.y = clamp(e.y, w + e.r, room.h - w - e.r);
+      for (const o of room.obstacles) if (!o.gone) resolveCircleObstacle(e, o);
+      e.level = levelAt(room, e.x, e.y);
+    }
 
     if (p.inv <= 0 && e.level === p.level && dist(e.x, e.y, p.x, p.y) < e.r + p.r + 2) {
       hurtPlayer(e.boss ? 2 : 1, e.x, e.y, 'contact');

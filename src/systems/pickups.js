@@ -36,6 +36,20 @@ export function updatePickups(room, dt) {
   }
 }
 
+// The special secret-reward gem: a jackpot. +1 max HP & full heal, a damage + fire bump,
+// and a guaranteed graft if one was seeded with it. Exported so the skyway apex can grant
+// it directly (the player rockets away too fast to rely on a chase-pickup).
+export function applyGemReward(room, p, q = {}) {
+  p.maxHp += 1; p.hp = p.maxHp;
+  p.perks.damage += 1; p.perks.fire += 1;
+  if (q.itemId) grantItem(q.itemId, 'found');
+  const fx = q.x ?? p.x, fy = q.y ?? p.y;
+  addFloat(room, p.x, p.y - 48, '✦ GEM ✦', '#bdeaff', true, 1.3);
+  burst(room, fx, fy, '#bdeaff', 28, 260, 0.65, 4.2);
+  burst(room, fx, fy, '#ffffff', 14, 160, 0.4, 3);
+  sfx('clear'); sfx('care');
+}
+
 function collect(room, p, q) {
   switch (q.type) {
     case 'spark':
@@ -76,15 +90,7 @@ function collect(room, p, q) {
       grantItem(q.itemId, 'found');
       break;
     case 'gem':
-      // The special secret-reward gem: a jackpot. +1 max HP & full heal, a damage + fire
-      // bump, and a guaranteed graft if one was seeded with it.
-      p.maxHp += 1; p.hp = p.maxHp;
-      p.perks.damage += 1; p.perks.fire += 1;
-      if (q.itemId) grantItem(q.itemId, 'found');
-      addFloat(room, p.x, p.y - 48, '✦ GEM ✦', '#bdeaff', true, 1.3);
-      burst(room, q.x, q.y, '#bdeaff', 28, 260, 0.65, 4.2);
-      burst(room, q.x, q.y, '#ffffff', 14, 160, 0.4, 3);
-      sfx('clear'); sfx('care');
+      applyGemReward(room, p, q);
       break;
     default:
       sfx('pickup');

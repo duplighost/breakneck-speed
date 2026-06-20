@@ -79,8 +79,10 @@ export function updateCamera(dt) {
   const vw = view.W / view.scale, vh = view.H / view.scale;
   const tx = p.x + p.aimX * 58 + p.vx * 0.09 - vw / 2;
   const ty = p.y + p.aimY * 58 + p.vy * 0.09 - vh / 2;
-  cam.x = damp(cam.x, clampCam(tx, room.w, vw), 8.8, dt);
-  cam.y = damp(cam.y, clampCam(ty, room.h, vh), 8.8, dt);
+  // riding the skyway carries you off the map — let the camera follow into open sky
+  const freeCam = p.rail?.active && p.rail.rail?.skyway;
+  cam.x = damp(cam.x, freeCam ? tx : clampCam(tx, room.w, vw), 8.8, dt);
+  cam.y = damp(cam.y, freeCam ? ty : clampCam(ty, room.h, vh), 8.8, dt);
   cam.kickX = damp(cam.kickX, 0, 17, dt);
   cam.kickY = damp(cam.kickY, 0, 17, dt);
 }
