@@ -66,6 +66,7 @@ export function drawFrame() {
 
   drawEdgeRail(room, pal, p);
   drawTiers(room, pal);
+  drawHoloAds(room, pal);        // giant animated holographic billboards on the towers
   drawSurfaces(room, pal, 1);    // rooftop surfaces, drawn onto the platform tops
   drawSkyRails(room, pal, p);
   drawOffRoutes(room, pal, p);
@@ -219,6 +220,68 @@ function drawTiers(room, pal) {
     if (t.x + t.w < vis.l || t.x > vis.r || t.y + t.h < vis.t || t.y - roofLift(t) > vis.b) continue;
     drawBuilding(room, pal, t);
   }
+}
+
+// Giant animated holographic billboards on the tower faces — the iconic neon-city ad blitz.
+// Four channels (data ticker / pulsing target / rotating logo / scrolling glyphs), each a
+// glowing glass panel clipped over the building's upper facade. Deterministic + animated.
+function drawHoloAds(room, pal) {
+  if (reduced() || state.lowFx || !room.tiers) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(220);
+  for (const tier of room.tiers) {
+    if (!tier.ad) continue;
+    const L = roofLift(tier), topY = tier.y - L;
+    if (tier.x + tier.w < vis.l || tier.x > vis.r || tier.y < vis.t || topY > vis.b) continue;
+    const hue = (tier.adHue || 0) * 360;
+    const col = `hsl(${hue | 0}, 90%, 64%)`, col2 = `hsl(${(hue + 40) | 0}, 90%, 70%)`;
+    const pw = tier.w * 0.7, ph = Math.min(tier.h * 0.7, L * 0.5 + 60);
+    const px = tier.x + tier.w * 0.15, py = topY + tier.h * 0.42;
+    ctx.save();
+    // glass panel + glowing frame
+    ctx.globalAlpha = 0.5; ctx.fillStyle = 'rgba(4,6,14,0.6)';
+    roundRectPath(ctx, px, py, pw, ph, 8); ctx.fill();
+    ctx.save();
+    roundRectPath(ctx, px, py, pw, ph, 8); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    const cx = px + pw / 2, cy = py + ph / 2;
+    if (tier.adKind === 0) {           // data ticker — scrolling horizontal bars
+      const rows = 5, rh = ph / rows;
+      for (let r = 0; r < rows; r++) {
+        const w2 = pw * (0.3 + 0.6 * hsh(tier.id * 3 + r));
+        const sx = px + ((t * (60 + r * 18) + r * 50) % (pw + w2)) - w2;
+        ctx.globalAlpha = 0.5; ctx.fillStyle = r % 2 ? col : col2;
+        ctx.fillRect(sx, py + r * rh + rh * 0.2, w2, rh * 0.55);
+      }
+    } else if (tier.adKind === 1) {    // pulsing concentric target
+      for (let i = 0; i < 4; i++) {
+        const rr = (Math.min(pw, ph) * 0.12) + i * (Math.min(pw, ph) * 0.12) + Math.sin(t * 2 - i) * 4;
+        ctx.globalAlpha = 0.4 - i * 0.06; ctx.strokeStyle = i % 2 ? col2 : col; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.stroke();
+      }
+    } else if (tier.adKind === 2) {     // rotating logo diamond
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.8 + tier.id);
+      const s = Math.min(pw, ph) * 0.3;
+      ctx.globalAlpha = 0.55; ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.8, 0); ctx.lineTo(0, s); ctx.lineTo(-s * 0.8, 0); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.8; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+    } else {                            // scrolling glyph grid
+      const gs = 14, scroll = (t * 26) % gs;
+      ctx.globalAlpha = 0.5; ctx.fillStyle = col;
+      for (let gy = py - gs; gy < py + ph + gs; gy += gs) for (let gx = px; gx < px + pw; gx += gs) {
+        if (hsh(Math.round(gx) * 0.7 + Math.round(gy + scroll) * 1.3 + tier.id) < 0.6) continue;
+        ctx.fillRect(gx + 2, gy + scroll + 2, gs - 5, gs - 5);
+      }
+    }
+    ctx.restore(); // unclip
+    // frame
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.5 + 0.2 * Math.sin(t * 2 + tier.id); ctx.strokeStyle = col; ctx.lineWidth = 2.4;
+    roundRectPath(ctx, px, py, pw, ph, 8); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 
 // Floating elite HP bar + name, drawn in world space above each mini-boss (lifted to its

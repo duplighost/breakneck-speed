@@ -767,6 +767,10 @@ function decorateBuilding(room, rng, tier, districtId) {
   tier.texSet = chance(rng, tallKind ? 0.62 : 0.45) ? 1 : 0;    // two facade treatments, mixed
   tier.crown = tier.rise > 1.7 ? pick(rng, ['mast', 'ring', 'billboard']) : pick(rng, BUILDING_CROWNS);
   tier.litSeed = rng();                                         // deterministic window lighting
+  // tall towers (and some others) carry a giant animated holo-billboard on their face
+  tier.ad = tier.rise > 1.3 || chance(rng, 0.35);
+  tier.adKind = randi(rng, 0, 3);                               // 0 ticker / 1 ring / 2 logo / 3 glyphs
+  tier.adHue = rng();
   return tier;
 }
 
