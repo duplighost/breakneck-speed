@@ -61,9 +61,10 @@ export function snapCamera() {
   cam.y = clampCam(p.y - vh / 2, room.h, vh);
 }
 
+const CAM_MARGIN = 240; // let the view drift past the edge so the outer megaskyline shows
 function clampCam(v, roomSpan, viewSpan) {
   if (viewSpan >= roomSpan) return (roomSpan - viewSpan) / 2; // room smaller than view: center
-  return clamp(v, 0, roomSpan - viewSpan);
+  return clamp(v, -CAM_MARGIN, roomSpan - viewSpan + CAM_MARGIN);
 }
 
 export function kick(x, y) { cam.kickX += x; cam.kickY += y; }

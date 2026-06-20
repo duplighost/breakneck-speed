@@ -41,6 +41,7 @@ export function drawFrame() {
   // baked background
   if (room.background) ctx.drawImage(room.background, 0, 0, room.w, room.h); // baked at backgroundScale, drawn full-size
   else { ctx.fillStyle = pal.floor; ctx.fillRect(0, 0, room.w, room.h); }
+  drawOuterSkyline(room, pal);   // colossal megatowers beyond the edge rail — the city's horizon
   // Readability wash: the baked city (districts, signage, floor decals) looks great but
   // is visually loud. A gentle dark veil over the floor pushes that decoration BACK so
   // the things that matter mid-fight — enemies, bullets, pickups, hazards, walls, rails —
@@ -51,6 +52,7 @@ export function drawFrame() {
   drawFloorMotion(room, pal);    // the living, moving floor — biome-specific currents
   drawAtmosphere(room, pal);     // drifting glowing motes — ambient depth/eye-candy
   drawFlowLanes(room, pal, p);   // animated neon boost boulevards over the baked floor
+  drawLaneTraffic(room, pal);    // headlights streaking the boulevards — the city moves
   drawSurfaces(room, pal, 0);    // ground surfaces: slick / tar / charge patches
 
   // wall frame
@@ -67,6 +69,7 @@ export function drawFrame() {
   drawSurfaces(room, pal, 1);    // rooftop surfaces, drawn onto the platform tops
   drawSkyRails(room, pal, p);
   drawOffRoutes(room, pal, p);
+  drawSkyLife(room, pal, p);      // flying vehicles + sweeping searchlights high over the city
   drawEscapeRail(room, pal, p);
   drawAnnexSeals(room, pal);
   drawSetpieces(room, pal);
@@ -1019,6 +1022,166 @@ function dist2(x1, y1, x2, y2) {
 function visibleRect(margin = 0) {
   const invS = 1 / (view.scale || 1);
   return { l: cam.x - margin, t: cam.y - margin, r: cam.x + view.W * invS + margin, b: cam.y + view.H * invS + margin };
+}
+
+// ── The outer megaskyline: colossal towers BEYOND the surrounding edge rail, rising into
+// a glowing horizon. Drawn behind the playfield; the city covers any inward overlap, so you
+// only see them looming past the city's edge — impossibly tall, the sense the sprawl never
+// ends. Deterministic per position so it's stable + cheap (only edges near the view draw).
+function drawSkylineTower(cx, baseY, w, h, skin, pal, t, seed, alpha) {
+  const topY = baseY - h;
+  ctx.globalCompositeOperation = 'source-over';
+  const g = ctx.createLinearGradient(0, topY, 0, baseY);
+  g.addColorStop(0, mixHex(skin, '#070810', 0.5));
+  g.addColorStop(1, mixHex(pal.bg, '#000000', 0.18));
+  ctx.globalAlpha = alpha; ctx.fillStyle = g;
+  ctx.fillRect(cx - w / 2, topY, w, h);
+  ctx.globalCompositeOperation = 'lighter';
+  // neon crest band
+  ctx.globalAlpha = alpha * (0.55 + 0.22 * Math.sin(t * 0.8 + seed)); ctx.fillStyle = hexA(skin, 0.5);
+  ctx.fillRect(cx - w / 2, topY, w, 9);
+  // antenna + blinking aircraft light
+  ctx.globalAlpha = alpha * 0.6; ctx.strokeStyle = hexA(skin, 0.7); ctx.lineWidth = 2;
+  const antH = 24 + hsh(seed) * 36;
+  ctx.beginPath(); ctx.moveTo(cx, topY); ctx.lineTo(cx, topY - antH); ctx.stroke();
+  ctx.globalAlpha = alpha * (0.35 + 0.55 * Math.abs(Math.sin(t * 2 + seed)));
+  ctx.fillStyle = '#ff5d6c'; ctx.beginPath(); ctx.arc(cx, topY - antH, 2.6, 0, TAU); ctx.fill();
+  // lit windows (sparse, twinkling)
+  const cols = clamp(Math.floor(w / 17), 2, 11), rows = clamp(Math.floor(h / 26), 4, 40);
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
+    if (hsh(seed + c * 5.3 + r * 2.1) < 0.66) continue;
+    const wx = cx - w / 2 + 4 + c * (w - 8) / cols, wy = topY + 12 + r * (h - 18) / rows;
+    ctx.globalAlpha = alpha * (0.3 + 0.45 * Math.sin(t * 1.4 + c * 3 + r));
+    ctx.fillStyle = mixHex(skin, '#fff7d8', 0.5);
+    ctx.fillRect(wx, wy, ((w - 8) / cols) * 0.52, ((h - 18) / rows) * 0.42);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function drawOuterSkyline(room, pal) {
+  if (state.lowFx) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(420);
+  const wall = room.wall;
+  const skins = [pal.accent2, pal.accent3, pal.accent, '#bdeaff', '#ffd9a6'];
+  const tower = (i, cx, baseY, near) => {
+    const s = hsh(i * 12.9 + 3.1);
+    const w = (near ? 156 : 100) + s * (near ? 150 : 96);
+    const h = (near ? 620 : 380) + hsh(i * 7.7) * (near ? 760 : 460); // tall as hell
+    drawSkylineTower(cx, baseY, w, h, skins[i % skins.length], pal, t, i * 1.7, near ? 0.9 : 0.56);
+  };
+  // horizon haze behind the top skyline
+  const nearTop = vis.t < wall + 260;
+  if (nearTop) {
+    const hz = ctx.createLinearGradient(0, -260, 0, wall + 360);
+    hz.addColorStop(0, hexA(pal.accent2, 0.10)); hz.addColorStop(0.7, hexA(pal.accent, 0.05)); hz.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = hz;
+    ctx.fillRect(vis.l, -260, vis.r - vis.l, wall + 620); ctx.restore();
+  }
+  ctx.save();
+  // TOP edge — the showpiece horizon (two parallax rows)
+  if (nearTop) {
+    for (let cx = Math.floor(vis.l / 230) * 230; cx < vis.r + 230; cx += 230) { const i = Math.round(cx / 230); tower(i + 900, cx + (hsh(i) - 0.5) * 90, wall * 0.5 + 40, false); }
+    for (let cx = Math.floor(vis.l / 300) * 300; cx < vis.r + 300; cx += 300) { const i = Math.round(cx / 300); tower(i + 100, cx + (hsh(i + 3) - 0.5) * 120, wall * 0.5 + 96, true); }
+  }
+  // BOTTOM edge — towers looming up from beyond the lower border
+  if (vis.b > room.h - wall - 240) {
+    for (let cx = Math.floor(vis.l / 320) * 320; cx < vis.r + 320; cx += 320) { const i = Math.round(cx / 320); tower(i + 300, cx + (hsh(i + 5) - 0.5) * 120, room.h + 150, true); }
+  }
+  // LEFT / RIGHT edges — receding side skyline
+  if (vis.l < wall + 240) {
+    for (let cy = Math.floor(vis.t / 300) * 300; cy < vis.b + 300; cy += 300) { const i = Math.round(cy / 300); tower(i + 500, wall * 0.5 - 30, cy + 220 + (hsh(i + 7) - 0.5) * 120, false); }
+  }
+  if (vis.r > room.w - wall - 240) {
+    for (let cy = Math.floor(vis.t / 300) * 300; cy < vis.b + 300; cy += 300) { const i = Math.round(cy / 300); tower(i + 700, room.w - wall * 0.5 + 30, cy + 220 + (hsh(i + 9) - 0.5) * 120, false); }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+// Living streets: headlights streaking along the boost boulevards in both directions, so
+// the city is visibly MOVING at speed even when you're standing still.
+function drawLaneTraffic(room, pal) {
+  if (reduced() || state.lowFx) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(120);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  for (const l of room.flowLanes || []) {
+    if (Math.max(l.x1, l.x2) < vis.l || Math.min(l.x1, l.x2) > vis.r || Math.max(l.y1, l.y2) < vis.t || Math.min(l.y1, l.y2) > vis.b) continue;
+    const dx = l.x2 - l.x1, dy = l.y2 - l.y1, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+    const lanes = (l.kind === 'artery' || l.kind === 'express') ? 3 : 2;
+    const count = clamp(Math.floor(len / 480), 2, 10);
+    for (let lane = 0; lane < lanes; lane++) {
+      const off = (lane - (lanes - 1) / 2) * (l.width || 90) * 0.3;
+      const dir = lane % 2 ? 1 : -1;
+      const spd = (l.boost || 600) * 1.7 * dir;
+      for (let k = 0; k < count; k++) {
+        let ph = (t * spd / len + k / count + lane * 0.17) % 1; if (ph < 0) ph += 1;
+        const s = ph * len, x = l.x1 + ux * s + nx * off, y = l.y1 + uy * s + ny * off;
+        if (x < vis.l || x > vis.r || y < vis.t || y > vis.b) continue;
+        ctx.globalAlpha = 0.5; ctx.strokeStyle = dir > 0 ? '#fff2cf' : '#9fe8ff'; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(x - ux * dir * 15, y - uy * dir * 15); ctx.lineTo(x, y); ctx.stroke();
+        ctx.globalAlpha = 0.85; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, TAU); ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+// High life: aircraft streaking across the sky on their own flight lanes (blinking nav
+// lights + trails + faint ground shadow), and searchlights sweeping up from the tallest
+// towers. Sells a vast, vertical, working metropolis.
+function drawSkyLife(room, pal, p) {
+  if (reduced() || state.lowFx) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(220);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  const range = room.w + 600;
+  for (let i = 0; i < 9; i++) {
+    const dir = hsh(i * 2.7) > 0.5 ? 1 : -1;
+    const speed = 230 + hsh(i * 1.9) * 320;
+    const lift = 240 + hsh(i * 3.3) * 460;
+    const yLane = room.wall + 220 + hsh(i * 5.1) * Math.max(200, room.h - room.wall * 2 - 440);
+    let x = (hsh(i * 7.7) * range + t * speed * dir); x = ((x % range) + range) % range - 300;
+    const y = yLane - lift;
+    if (x < vis.l - 120 || x > vis.r + 120 || y < vis.t - 120 || y > vis.b + 120) continue;
+    const col = i % 3 === 0 ? pal.accent2 : i % 3 === 1 ? '#fff2cf' : pal.accent3;
+    ctx.globalAlpha = 0.30; ctx.strokeStyle = col; ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.moveTo(x - dir * 50, y); ctx.lineTo(x, y); ctx.stroke();
+    ctx.globalAlpha = 0.85; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(x, y, 7, 3, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.4 + 0.5 * Math.abs(Math.sin(t * 4 + i)); ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(x + dir * 6, y, 1.8, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.08; ctx.fillStyle = '#000000';
+    ctx.beginPath(); ctx.ellipse(x, yLane, 10, 3, 0, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+  }
+  // searchlights from the two tallest towers
+  const tall = (room.tiers || []).slice().sort((a, b) => (b.rise || 1) - (a.rise || 1)).slice(0, 2);
+  for (let k = 0; k < tall.length; k++) {
+    const tt = tall[k];
+    const ox = tt.x + tt.w * (0.3 + 0.4 * k), oy = tt.y - roofLift(tt) - 8;
+    if (ox < vis.l - 240 || ox > vis.r + 240 || oy < vis.t - 500 || oy > vis.b + 200) continue;
+    const ang = -Math.PI / 2 + Math.sin(t * 0.45 + k * 2.1) * 0.75, len = 600, half = 0.085;
+    const ex = ox + Math.cos(ang) * len, ey = oy + Math.sin(ang) * len;
+    const grad = ctx.createLinearGradient(ox, oy, ex, ey);
+    grad.addColorStop(0, hexA('#ffffff', 0.16)); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalAlpha = 1; ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + Math.cos(ang - half) * len, oy + Math.sin(ang - half) * len);
+    ctx.lineTo(ox + Math.cos(ang + half) * len, oy + Math.sin(ang + half) * len);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.7; ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(ox, oy, 3, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 
 // Ambient atmosphere: two parallax depths of slow-drifting, twinkling light motes
