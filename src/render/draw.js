@@ -194,6 +194,7 @@ export function drawFrame() {
     ctx.restore();
   }
   drawEclipse(room); // False Moon's eclipse darkens the field around the moon
+  if (room.weather === 'rain') drawRain(pal); // neon rain over the rain-slicked districts
   if (state.mode === 'play') drawSpeedStreaks(p); // anime speed-lines at dash/flow velocity
   if (p && state.mode === 'play') drawDangerTriangles(room, p);
   if (room.portal) drawPortalArrow(room);
@@ -1173,6 +1174,29 @@ function drawOuterSkyline(room, pal) {
   }
   if (vis.r > room.w - wall - 240) {
     for (let cy = Math.floor(vis.t / 300) * 300; cy < vis.b + 300; cy += 300) { const i = Math.round(cy / 300); tower(i + 700, room.w - wall * 0.5 + 30, cy + 220 + (hsh(i + 9) - 0.5) * 120, false); }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+// Neon rain: two parallax layers of slanted glowing streaks (screen-space), plus a faint
+// cool mood wash. Pairs with the wet-street building reflections for full cyberpunk drizzle.
+function drawRain(pal) {
+  if (reduced() || state.lowFx) return;
+  const tt = performance.now() / 1000, W = view.W, H = view.H;
+  ctx.save();
+  // cool mood wash
+  ctx.globalAlpha = 0.06; ctx.fillStyle = '#3a4a78'; ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  const layers = [{ n: 110, spd: 1050, len: 26, a: 0.12, slant: 0.22, col: pal.accent2 },
+    { n: 72, spd: 1700, len: 46, a: 0.2, slant: 0.30, col: '#cfe6ff' }];
+  for (const L of layers) {
+    ctx.strokeStyle = L.col; ctx.lineWidth = 1.2; ctx.globalAlpha = L.a;
+    for (let i = 0; i < L.n; i++) {
+      const x0 = ((hsh(i * 3.1) * (W + 240) + tt * 70 * L.slant)) % (W + 240) - 120;
+      const y0 = ((hsh(i * 7.7) * (H + L.len) + tt * L.spd)) % (H + L.len) - L.len;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 - L.slant * L.len, y0 + L.len); ctx.stroke();
+    }
   }
   ctx.restore();
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
