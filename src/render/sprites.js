@@ -123,8 +123,11 @@ export function drawPlayer(ctx, p, room) {
     const a = p.after[i];
     // dash afterimages burn brighter than the idle motion ghost — a vivid streak of you
     const aAlpha = clamp(a.life / (a.dash ? 0.22 : 0.16), 0, 1) * (a.dash ? 0.44 : 0.16);
+    const ag = Math.abs(a.grindSpin || 0) > 0.002;
+    if (ag) { const piv = a.y - 14 * PLAYER_DRAW_SCALE; ctx.save(); ctx.translate(a.x, piv); ctx.rotate(a.grindSpin); ctx.translate(-a.x, -piv); }
     drawPlayerBody(ctx, a.x, a.y, a.face, pal, aAlpha, true, a.spin || 0,
       { speed: a.dash ? 520 : 120, moveFace: a.moveFace || a.face, animT: a.animT || 0, rail: a.rail });
+    if (ag) ctx.restore();
   }
   if (p.dashT > 0) {
     const k = clamp(p.dashT / (p.dashDur || 0.001), 0, 1), ring = 1 - k;
@@ -169,8 +172,12 @@ export function drawPlayer(ctx, p, room) {
     ctx.restore();
   }
   if (p._cat) drawCat(ctx, p._cat.x, p._cat.y, 0.58, pal);
+  // grind backflip: spin the whole rig (boots + body) about its centre while railing
+  const gflip = Math.abs(p.grindSpin || 0) > 0.002;
+  if (gflip) { const piv = p.y - 14 * PLAYER_DRAW_SCALE; ctx.save(); ctx.translate(p.x, piv); ctx.rotate(p.grindSpin); ctx.translate(-p.x, -piv); }
   drawRocketBoots(ctx, p, pose, pal);   // exhaust jets behind the boots → instant directionality
   drawPlayerBody(ctx, p.x, p.y, p.face, pal, 1, false, spin, pose);
+  if (gflip) ctx.restore();
   if (p.hurt > 0) {
     ctx.strokeStyle = pal.bad + 'cc'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(p.x, p.y, (42 + (1 - p.hurt / 0.42) * 28) * PLAYER_EFFECT_SCALE, 0, TAU); ctx.stroke();

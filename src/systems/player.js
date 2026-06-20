@@ -79,6 +79,14 @@ export function updatePlayer(p, move, aim, room, dt) {
     if (p.shieldTimer >= 10) { p.shield++; p.shieldTimer = 0; }
   }
 
+  // Grind tricks: each rail-dash kicks a backflip (grindSpinV), the spin decelerates, and
+  // it unwinds to upright the moment you leave the rail. Drives the sprite spin in drawPlayer
+  // so grinds are genuinely cool to watch. A fast rocket-grind also keeps a steady spin going.
+  if (p.rail?.active && (p.rail.rocketT || 0) > 0) p.grindSpinV = Math.max(p.grindSpinV || 0, 11 * (p.rail.dir || 1));
+  p.grindSpin = (p.grindSpin || 0) + (p.grindSpinV || 0) * dt;
+  p.grindSpinV = damp(p.grindSpinV || 0, 0, 3.0, dt);
+  if (!p.rail?.active) p.grindSpin = damp(p.grindSpin || 0, 0, 9, dt);
+
   // aim + auto-fire: the gun never stops. Manual aim wins; with no manual aim, lock
   // onto the nearest enemy so you keep shooting without aiming (constant flow state).
   let firing = false;
@@ -358,7 +366,7 @@ function finishPlayerFrame(p, room, sp, dt, movingIntent) {
   }
   // afterimages — longer-lived and more numerous during a dash/rail rocket/vent hop
   p.after.unshift({
-    x: p.x, y: p.y, face: p.face, spin: dashSpinPhase(p), life: dashLike ? 0.22 : 0.16,
+    x: p.x, y: p.y, face: p.face, spin: dashSpinPhase(p), grindSpin: p.grindSpin || 0, life: dashLike ? 0.22 : 0.16,
     dash: dashLike, moveFace: p.moveFace, animT: p.animT, rail: !!p.rail?.active, airZ: p.airZ || 0,
   });
   const afterCap = dashLike ? 13 : 9; // device parity: same dash-trail length on phone + desktop
@@ -930,6 +938,7 @@ export function tryDash(dx = null, dy = null, move = null) {
         p.rail.dir = along >= 0 ? 1 : -1;
         p.rail.speed = Math.max(p.rail.speed || 0, 3300);
         p.rail.rocketT = 0.66;
+        p.grindSpinV = 24 * (p.rail.dir || 1); // crisp backflip off the dash
         p.lastDashAngle = Math.atan2(info.ty * p.rail.dir, info.tx * p.rail.dir);
         p._dashHitIds = new Set(); p._dashCutPrimed = false;
         p.inv = Math.max(p.inv, PLAYER.DASH_IFRAMES);
@@ -952,6 +961,7 @@ export function tryDash(dx = null, dy = null, move = null) {
         p.rail.dir = along >= 0 ? 1 : -1;
         p.rail.speed = Math.max(p.rail.speed || 0, 3050);
         p.rail.rocketT = 0.64;
+        p.grindSpinV = 24 * (p.rail.dir || 1); // crisp backflip off the dash
         p.lastDashAngle = Math.atan2(info.ty * p.rail.dir, info.tx * p.rail.dir);
         p._dashHitIds = new Set(); p._dashCutPrimed = false;
         p.inv = Math.max(p.inv, PLAYER.DASH_IFRAMES);

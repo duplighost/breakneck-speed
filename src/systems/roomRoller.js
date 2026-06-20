@@ -912,15 +912,18 @@ function seedSkyRails(room, rng) {
     used.add(k);
     connected.add(pair.a.id); connected.add(pair.b.id);
     const A = point(pair.a, trunk ? 0.16 : 0.24), B = point(pair.b, trunk ? 0.16 : 0.24);
-    // Some rails TWIST: a sine-bow across the span (1-2 arcs), so the grind weaves instead
-    // of running dead-straight. The trunk spine stays straight (it's the readable highway).
+    // Most rails TWIST now: a sine-bow across the span (1-3 arcs), so the grind weaves and
+    // corkscrews instead of running dead-straight. The trunk spine keeps a gentle single
+    // sweep (still the readable highway); branches get the wild weaves.
     const span = dist(A.x, A.y, B.x, B.y);
-    const bow = (!trunk && span > 520 && chance(rng, 0.5)) ? rand(rng, 0.16, 0.32) * span * (chance(rng, 0.5) ? 1 : -1) : 0;
+    const bow = trunk
+      ? (span > 700 && chance(rng, 0.5) ? rand(rng, 0.10, 0.18) * span * (chance(rng, 0.5) ? 1 : -1) : 0)
+      : (span > 420 && chance(rng, 0.78) ? rand(rng, 0.22, 0.42) * span * (chance(rng, 0.5) ? 1 : -1) : 0);
     room.skyRails.push({
       x1: A.x, y1: A.y, x2: B.x, y2: B.y,
       level: 1, width: trunk ? 70 : 56, boost: trunk ? 2250 : 1900,
       rise: ((pair.a.rise || 1) + (pair.b.rise || 1)) / 2, // ride at the connected roofs' height
-      trunk, bow, twists: bow ? randi(rng, 1, 2) : 0,
+      trunk, bow, twists: bow ? (trunk ? 1 : randi(rng, 1, 3)) : 0,
       color: chance(rng, 0.5) ? room.biome.pal.accent2 : room.biome.pal.accent3,
       phase: rng() * TAU,
     });
