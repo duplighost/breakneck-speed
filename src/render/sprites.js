@@ -99,6 +99,19 @@ export function drawPlayer(ctx, p, room) {
     ctx.beginPath(); ctx.arc(p.x, p.y - 6, rr, 0, TAU); ctx.stroke();
     ctx.restore();
   }
+  // REDLINE surge: the passenger BLAZES — a hot double ring pulsing red→white at hyperspeed.
+  const redT = state.run?.redlineT || 0;
+  if (redT > 0 && !reduced()) {
+    const tt = performance.now() / 1000, pulse = 0.7 + 0.3 * Math.sin(tt * 16);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowColor = '#ff5d6c'; ctx.shadowBlur = 20;
+    ctx.globalAlpha = 0.4 * pulse; ctx.strokeStyle = '#ff5d6c'; ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.arc(p.x, p.y - 6, (p.r + 14) * (1 + 0.18 * Math.sin(tt * 11)), 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.55 * pulse; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(p.x, p.y - 6, p.r + 7, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
   // slipstream trail — directional speed-smear behind movement (concept panel 3)
   if (sp > 150) {
     const inv = 1 / sp, bx = -p.vx * inv, by = -p.vy * inv;       // backward unit
