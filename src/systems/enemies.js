@@ -208,8 +208,8 @@ export function updateEnemies(room, dt) {
     }
 
     e.x += e.vx * dt; e.y += e.vy * dt;
-    if (e.skyway) {
-      e.level = 1; // off-map sky sentinels stay on the rail at roof level (no bounds clamp / no floor relevel)
+    if (e.offRoute) {
+      e.level = e.offRoute.kind === 'under' ? 0 : 1; // off-map sentinels hold the rail (no bounds clamp / no floor relevel)
     } else {
       const w = room.wall - 22;
       e.x = clamp(e.x, w + e.r, room.w - w - e.r);

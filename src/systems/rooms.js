@@ -153,8 +153,9 @@ export function updateRound(dt) {
 
   if (p.dead) { die(); return; }
 
-  // Skyway sentinels live off the map on a secret rail — they never gate the room clear.
-  const liveEnemies = room.skyway ? room.enemies.some(e => !e.skyway) : room.enemies.length > 0;
+  // Off-route sentinels (skyway/underground) live off the map on secret rails — they never
+  // gate the room clear.
+  const liveEnemies = room.enemies.some(e => !e.offRoute);
   if (!room.cleared && !liveEnemies && room.spawnQueue.length === 0 && wavesDone(room) && room.time > 0.8) {
     clearRoom(room);
   }

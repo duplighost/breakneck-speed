@@ -519,10 +519,16 @@ function maybeLatchRail(p, room, x0 = p.x, y0 = p.y, startLevel = p.level || 0) 
 function tryLatchSkyRail(p, room, x0, y0, startLevel = p.level || 0) {
   if ((p._railLatchCd || 0) > 0) return false;
   const rails = room.skyRails || [];
-  if (!rails.length || startLevel < 1 || (p.level || 0) < 1) return false; // floor-level dashes pass underneath
+  if (!rails.length) return false;
+  const lv = p.level || 0;
   let best = null, bestInfo = null, bestD = Infinity;
   for (const r of rails) {
-    if ((r.level || 1) !== (p.level || 0)) continue;
+    if (r.route) {
+      // off-routes: the UNDERGROUND latches from the street (lv 0); the SKYWAY from a roof
+      if (r.route.kind === 'under' ? lv !== 0 : (startLevel < 1 || lv < 1)) continue;
+    } else {
+      if (startLevel < 1 || lv < 1 || (r.level || 1) !== lv) continue; // floor dashes pass under normal sky rails
+    }
     const d = segmentSegmentDist(x0, y0, p.x, p.y, r.x1, r.y1, r.x2, r.y2);
     const info = pointSegmentInfo(p.x, p.y, r.x1, r.y1, r.x2, r.y2);
     const width = (r.width || 36) + p.r + 12;
@@ -537,7 +543,7 @@ function tryLatchSkyRail(p, room, x0, y0, startLevel = p.level || 0) {
   p.dashT = 0;
   p.dashCd = 0;
   p.inv = Math.max(p.inv, 0.24);
-  p.x = bestInfo.cx; p.y = bestInfo.cy; p.level = best.level || 1;
+  p.x = bestInfo.cx; p.y = bestInfo.cy; p.level = best.level != null ? best.level : 1;
   ripple(room, p.x, p.y, best.color || room.biome.pal.accent2, 104, 0.36);
   addFloat(room, p.x, p.y - 46, '↯', best.color || room.biome.pal.accent2, false, 0.42);
   return true;
@@ -727,9 +733,9 @@ function updateSkyRailRide(p, room, move, dt) {
     const along = move.x * info0.tx + move.y * info0.ty;
     const side = move.x * info0.nx + move.y * info0.ny;
     // Push perpendicular to a sky rail to drop/peel off. This makes long upper
-    // routes feel optional and stylish instead of sticky. (The skyway is committed —
-    // there's no safe landing off the map — so you can only steer along it to come back.)
-    if (!r.skyway && p.rail.t > 0.055 && Math.abs(side) > 0.38 && Math.abs(side) >= Math.abs(along) * 0.74) {
+    // routes feel optional and stylish instead of sticky. (Off-routes are committed —
+    // there's no safe landing off the map — so you can only steer along to come back.)
+    if (!r.route && p.rail.t > 0.055 && Math.abs(side) > 0.38 && Math.abs(side) >= Math.abs(along) * 0.74) {
       const info = { ...info0, dir: p.rail.dir || 1 };
       return detachRail(p, room, info, info0.nx * Math.sign(side) + info0.tx * along * 0.12,
         info0.ny * Math.sign(side) + info0.ty * along * 0.12,
@@ -758,15 +764,15 @@ function updateSkyRailRide(p, room, move, dt) {
       bx * (130 + Math.random() * 180), by * (130 + Math.random() * 180), 0.18, p.rail.rocketT > 0 ? 5.5 : 3.2, 'dot');
   }
   if (ended) {
-    if (r.skyway) {
+    if (r.route) {
       if ((p.rail.dir || 1) > 0 && p.rail.u >= 1) {
         // reached the apex off the map: bank the jewel, then rocket back into the city
         p.rail.u = 1;
-        if (room.skyway && !room.skyway.taken) { room.skyway.taken = true; awardSkywayJewel(p, room); }
+        if (!r.route.taken) { r.route.taken = true; awardOffJewel(p, room, r.route); }
         p.rail.dir = -1; p.rail.rocketT = Math.max(p.rail.rocketT || 0, 0.45);
         addFloat(room, p.x, p.y - 52, '↩', r.color || '#9fe8ff', true, 0.42);
       } else {
-        // back at the launch rooftop — detach safely, in-bounds
+        // back at the entrance — detach safely, in-bounds
         p.rail = null; p._railLatchCd = Math.max(p._railLatchCd || 0, 0.2);
         p.inv = Math.max(p.inv, 0.18);
         ripple(room, p.x, p.y, r.color || room.biome.pal.accent2, 92, 0.32);
@@ -781,13 +787,14 @@ function updateSkyRailRide(p, room, move, dt) {
   return true;
 }
 
-// The apex payoff: spawn the jackpot jewel right on the player so the normal pickup
-// collect runs (full heal + max-HP + damage/fire buffs), wrapped in a big flashy burst.
-function awardSkywayJewel(p, room) {
-  applyGemReward(room, p, { x: p.x, y: p.y });   // reliable jackpot — no chase-pickup to outrun
+// The apex payoff (skyway or underground): grant the jackpot directly (full heal + max-HP
+// + damage/fire buffs) wrapped in a big flashy burst — the player rockets away too fast to
+// rely on a chase-pickup.
+function awardOffJewel(p, room, route) {
+  applyGemReward(room, p, { x: p.x, y: p.y });
   burst(room, p.x, p.y, '#ffffff', 30, 440, 0.4, 4.4);
-  ripple(room, p.x, p.y, room.skyway?.color || '#9fe8ff', 160, 0.5);
-  addFloat(room, p.x, p.y - 64, 'SKY JEWEL', '#ffffff', true, 0.9);
+  ripple(room, p.x, p.y, route?.color || '#9fe8ff', 160, 0.5);
+  addFloat(room, p.x, p.y - 64, route?.kind === 'under' ? 'DEEP JEWEL' : 'SKY JEWEL', '#ffffff', true, 0.9);
   addShake(0.5); sfx('dash'); haptic(24); hitPause('boss');
 }
 
@@ -798,7 +805,7 @@ function nearestEnemy(room, p) {
   let best = null, bd = Infinity;
   const lv = p.level || 0;
   for (const e of room.enemies) {
-    if (e.hp <= 0 || e.skyway || (e.level || 0) !== lv) continue; // skyway sentinels are a dash gauntlet
+    if (e.hp <= 0 || e.offRoute || (e.level || 0) !== lv) continue; // off-route sentinels are a dash gauntlet
     const dx = e.x - p.x, dy = e.y - p.y, d = dx * dx + dy * dy;
     if (d < bd) { bd = d; best = e; }
   }

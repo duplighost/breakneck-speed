@@ -83,7 +83,7 @@ export function rollRoom(run, round) {
     biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId,
     floorplanId: 'none', openings: [], sanctum: null, tiers: [], vents: [], setpieces: [],
     surfaces: [], escapeRail: null,
-    districts: [], flowLanes: [], skyRails: [], skyways: [], signs: [], traffic: [], waypoints: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
+    districts: [], flowLanes: [], skyRails: [], skyways: [], offRoutes: [], signs: [], traffic: [], waypoints: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
     // XL city-scale sprawl — bigger than either fork. Density (cover, rooftops, rails,
     // surfaces, landmarks, enemy budget) all scale with area below so it stays packed.
     // Bigger arenas (~25% up): more room to grind, build, and hide secrets in.
@@ -255,6 +255,10 @@ export function rollRoom(run, round) {
   // ── secret #2: the SKYWAY — grind a rail off a rooftop, off the map, into open sky;
   // dash the sentinel gauntlet and grab the jackpot jewel at the apex. ──
   if (!bossId && room.tiers.length) seedSkyway(room, rng, px, py, portalX, portalY);
+
+  // ── secret #3: the UNDERGROUND — a street pit whose grind rail dives off the map, DOWN
+  // into a dark cavern to a buried jewel. The skyway's mirror. ──
+  if (!bossId) seedUnderground(room, rng, px, py, portalX, portalY);
 
   // ── axis 3: hazard kit ──
   seedHazards(room, rng);
@@ -1382,14 +1386,36 @@ function seedCloudRun(room, rng, px, py, portalX, portalY) {
   return false;
 }
 
-// ── Skyway: a grind rail that launches off a rooftop, OFF THE MAP, and climbs into open
-// sky. A gauntlet of turret sentinels lines the off-map stretch (dash through them for
-// iframes + the rocket cut), and a flashy jackpot jewel waits at the apex. You ride out,
-// clear the rail, grab the jewel, and the grind bounces you back into the city. Built on
-// the sky-rail ride (player.updateSkyRailRide handles the skyway branch). ──
+// ── Off-routes: special grind rails that leave the map to a jackpot jewel and bounce you
+// back. The SKYWAY climbs off a tall rooftop into open sky; the UNDERGROUND dives off a
+// street pit DOWN into a dark cavern. Both string a turret gauntlet you dash through, and
+// both reuse the sky-rail ride (player.updateSkyRailRide handles the rail.route branch). ──
+function buildOffRoute(room, rng, opts) {
+  const { kind, ex0, ey0, dx, dy, length, liftStart, liftEnd, color, level } = opts;
+  const ex = ex0 + dx * length, ey = ey0 + dy * length;     // off-map apex (the jewel)
+  const rail = {
+    x1: ex0, y1: ey0, x2: ex, y2: ey, level, width: 66, boost: 2550,
+    rise: 1, bow: 0, twists: 0, liftStart, liftEnd, color, phase: rng() * TAU,
+  };
+  const route = { rail, kind, launch: { x: ex0, y: ey0 }, jewel: { x: ex, y: ey }, color, taken: false };
+  rail.route = route;
+  (room.skyRails = room.skyRails || []).push(rail);
+  (room.offRoutes = room.offRoutes || []).push(route);
+  // turret sentinels along the off-map stretch (auto-dormant: turrets only fire within 980px)
+  const n = randi(rng, 3, 5);
+  for (let i = 0; i < n; i++) {
+    const u = 0.34 + (n > 1 ? (i / (n - 1)) * 0.54 : 0);
+    const e = makeEnemy('turret', ex0 + (ex - ex0) * u, ey0 + (ey - ey0) * u, room);
+    e.level = level; e.offRoute = route; e.routeU = u;
+    e.hp *= 0.7; e.maxHp = e.hp;
+    room.enemies.push(e);
+  }
+  room.landmarks.push({ kind: kind === 'sky' ? 'skyway' : 'underway', x: ex0, y: ey0 });
+  return route;
+}
+
 function seedSkyway(room, rng, px, py, portalX, portalY) {
-  if (room.bossId) return false;
-  if (!chance(rng, room.round >= 2 ? 0.5 : 0.32)) return false;
+  if (room.bossId || !chance(rng, room.round >= 2 ? 0.5 : 0.32)) return false;
   const tiers = room.tiers || [];
   if (!tiers.length) return false;
   const cx = room.w / 2, cy = room.h / 2;
@@ -1400,33 +1426,40 @@ function seedSkyway(room, rng, px, py, portalX, portalY) {
     .sort((a, b) => (b.edge * 0.6 + b.rise * 0.4) - (a.edge * 0.6 + a.rise * 0.4));
   const pickT = (cands[0] || { t: tiers[0] }).t;
   const lx = pickT.x + pickT.w / 2, ly = pickT.y + pickT.h / 2;
-  // outward = away from centre, biased onto the dominant axis for a clean exit off one side
   let dx = lx - cx, dy = ly - cy; const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
   if (Math.abs(dx) >= Math.abs(dy)) dy *= 0.42; else dx *= 0.42;
   const dn = Math.hypot(dx, dy) || 1; dx /= dn; dy /= dn;
-  const length = rand(rng, 2700, 3500);
-  const ex = lx + dx * length, ey = ly + dy * length;      // off-map apex (the jewel)
   const liftStart = TIER_LIFT * (pickT.rise || 1);
-  const liftEnd = liftStart + rand(rng, 480, 740);          // climbs high into the sky
-  const color = '#9fe8ff';
-  const rail = {
-    x1: lx, y1: ly, x2: ex, y2: ey, level: 1, width: 66, boost: 2550,
-    rise: pickT.rise || 1, skyway: true, bow: 0, twists: 0,
-    liftStart, liftEnd, color, phase: rng() * TAU,
-  };
-  (room.skyRails = room.skyRails || []).push(rail);
-  // turret sentinels along the off-map stretch (auto-dormant: turrets only fire within 980px)
-  const n = randi(rng, 3, 5);
-  for (let i = 0; i < n; i++) {
-    const u = 0.34 + (n > 1 ? (i / (n - 1)) * 0.54 : 0);
-    const e = makeEnemy('turret', lx + (ex - lx) * u, ly + (ey - ly) * u, room);
-    e.level = 1; e.skyway = true; e.skyU = u;
-    e.hp *= 0.7; e.maxHp = e.hp;
-    room.enemies.push(e);
-  }
-  room.skyway = { rail, launch: { x: lx, y: ly, lift: liftStart }, jewel: { x: ex, y: ey, lift: liftEnd }, color, taken: false };
-  room.landmarks.push({ kind: 'skyway', x: lx, y: ly });
+  buildOffRoute(room, rng, {
+    kind: 'sky', ex0: lx, ey0: ly, dx, dy, length: rand(rng, 2700, 3500),
+    liftStart, liftEnd: liftStart + rand(rng, 480, 740), color: '#9fe8ff', level: 1,
+  });
   return true;
+}
+
+// The UNDERGROUND: a street-level grind rail that dives off a pit, off the map, DOWN into a
+// dark cavern to a buried jewel. Mirrors the skyway but launches from the ground and the
+// rail descends (liftEnd < 0). Latches at level 0 (see player.tryLatchSkyRail).
+function seedUnderground(room, rng, px, py, portalX, portalY) {
+  if (room.bossId || !chance(rng, room.round >= 2 ? 0.42 : 0.26)) return false;
+  const margin = room.wall + 170;
+  const onTier = (x, y) => (room.tiers || []).some(t => x > t.x - 90 && x < t.x + t.w + 90 && y > t.y - 90 && y < t.y + t.h + 90);
+  // The pit sits in the lower city and the rail PLUNGES straight down off the bottom edge
+  // into the cavern — world-down and screen-down (negative lift) agree, so it reads as a
+  // real dive into a hole rather than fighting itself.
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const ox = rand(rng, margin, room.w - margin);
+    const oy = rand(rng, room.h * 0.60, room.h - margin);
+    if (dist(ox, oy, px, py) < ROOM.SPAWN_CLEAR + 120 || dist(ox, oy, portalX, portalY) < 280) continue;
+    if (pointBlockedForSpawn(room, ox, oy, 150) || onTier(ox, oy)) continue;
+    let dx = rand(rng, -0.34, 0.34), dy = 1; const dn = Math.hypot(dx, dy); dx /= dn; dy /= dn; // steep plunge down
+    buildOffRoute(room, rng, {
+      kind: 'under', ex0: ox, ey0: oy, dx, dy, length: (room.h - oy) + rand(rng, 1500, 2100),
+      liftStart: 0, liftEnd: -rand(rng, 380, 580), color: '#ffd9a6', level: 0,
+    });
+    return true;
+  }
+  return false;
 }
 
 // ── Neon districts + flow lanes (ported from ChatGPT's "neon districts" build) ──
@@ -1599,10 +1632,10 @@ function retargetFlowLanes(room, rng, px, py, portalX, portalY) {
   for (const v of room.vents || []) addPoint(v.x, v.y, v.kind === 'dropfan' ? 'dropfan' : 'vent', v.kind === 'dropfan' ? 'DROP' : 'ROOF', 3.6 + (v.toLevel || 0), v.fromLevel || 0);
   for (const t of room.tiers || []) addPoint(t.ramp?.x || (t.x + t.w / 2), t.y + t.h, 'ramp', 'ROOF', 3.2, 0);
   for (const l of room.landmarks || []) {
-    const val = l.kind === 'skyway' ? 5.8
+    const val = l.kind === 'skyway' ? 5.8 : l.kind === 'underway' ? 5.6
       : l.kind === 'skyCache' || l.kind === 'mysteryVault' || l.kind === 'undervault' ? 5.2
       : l.kind === 'dashBell' ? 4.4 : l.kind === 'highGround' ? 3.8 : l.kind === 'vent' ? 3.6 : 2.2;
-    const label = l.kind === 'dashBell' ? 'DASH' : l.kind === 'skyCache' ? 'CACHE' : l.kind === 'skyway' ? 'SKY' : 'GO';
+    const label = l.kind === 'dashBell' ? 'DASH' : l.kind === 'skyCache' ? 'CACHE' : l.kind === 'skyway' ? 'SKY' : l.kind === 'underway' ? 'DOWN' : 'GO';
     if (val >= 3.2) addPoint(l.x, l.y, l.kind, label, val);
   }
   room.waypoints = points;

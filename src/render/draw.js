@@ -65,7 +65,7 @@ export function drawFrame() {
   drawTiers(room, pal);
   drawSurfaces(room, pal, 1);    // rooftop surfaces, drawn onto the platform tops
   drawSkyRails(room, pal, p);
-  drawSkyway(room, pal, p);
+  drawOffRoutes(room, pal, p);
   drawEscapeRail(room, pal, p);
   drawAnnexSeals(room, pal);
   drawSetpieces(room, pal);
@@ -92,12 +92,12 @@ export function drawFrame() {
     renderables.push({ y: o.type === 'circle' ? o.y + o.rad : o.y + o.h, lv, lift: liftAt(room, ocx, ocy, o.level), draw: () => drawObstacle(ctx, o, room) });
   }
   for (const e of room.enemies) {
-    const eLift = e.skyway && room.skyway ? skywayLift(room.skyway.rail, e.skyU) : liftAt(room, e.x, e.y, e.level);
+    const eLift = e.offRoute ? skywayLift(e.offRoute.rail, e.routeU) : liftAt(room, e.x, e.y, e.level);
     renderables.push({ y: e.y + e.r, lv: e.level || 0, lift: eLift, draw: () => drawEnemy(ctx, e, room) });
   }
   if (p && !p.dead) {
-    const onSky = p.rail?.active && p.rail.rail?.skyway && room.skyway;
-    const pLift = (onSky ? skywayLift(room.skyway.rail, p.rail.u || 0) : liftAt(room, p.x, p.y, p.level)) + (p.airZ || 0);
+    const onRoute = p.rail?.active && p.rail.rail?.route;
+    const pLift = (onRoute ? skywayLift(p.rail.rail, p.rail.u || 0) : liftAt(room, p.x, p.y, p.level)) + (p.airZ || 0);
     renderables.push({ y: p.y + p.r + 6, lv: p.level || 0, lift: pLift, draw: () => drawPlayer(ctx, p, room) });
   }
   renderables.sort((a, b) => (a.lv - b.lv) || (a.y - b.y));
@@ -400,7 +400,7 @@ function drawSkyRails(room, pal, p) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.globalCompositeOperation = 'lighter';
   for (const r of rails) {
-    if (r.skyway) continue; // the skyway climbs off the map — drawn by drawSkyway
+    if (r.route) continue; // off-routes (skyway/underground) leave the map — drawn by drawOffRoutes
     const active = activeRail === r;
     // each rail rides at the height of the roofs it connects (second-layer; floor dashes ignore it)
     ctx.save();
@@ -430,10 +430,10 @@ function drawSkyRails(room, pal, p) {
   ctx.restore();
 }
 
-// ── The SKYWAY: a grind rail that climbs off a rooftop, off the map, into open sky —
-// deep-sky backdrop + drifting clouds + stars, a bright climbing track with outward
-// chevrons, a flashy jackpot jewel at the apex, and a beacon over the launch rooftop so
-// you can find the entrance from the ground. ──
+// ── Off-routes: special grind rails that leave the map to a jackpot jewel. The SKYWAY
+// climbs off a rooftop into open sky (halo + clouds + stars); the UNDERGROUND dives off a
+// street pit into a dark cavern (occluding mass + dug shaft + crystals). Shared: the bright
+// track with outward chevrons, the faceted apex jewel, and an entrance marker. ──
 function drawCloudPuff(x, y, r, col) {
   ctx.fillStyle = hexA(col, 0.5);
   for (const [ox, oy, rr] of [[0, 0, 1], [-r * 0.7, r * 0.16, 0.72], [r * 0.7, r * 0.18, 0.66], [-r * 0.3, -r * 0.3, 0.6], [r * 0.34, -r * 0.26, 0.58]]) {
@@ -450,63 +450,36 @@ function drawJewelShape(x, y, s, col, t) {
   ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.95; ctx.beginPath(); ctx.arc(0, -s * 0.1, s * 0.18, 0, TAU); ctx.fill();
   ctx.restore();
 }
-function drawSkyway(room, pal, p) {
-  const sky = room.skyway;
-  if (!sky) return;
-  const r = sky.rail;
+function drawOffRoutes(room, pal, p) {
+  for (const route of room.offRoutes || []) drawOffRoute(room, pal, p, route);
+}
+
+function drawOffRoute(room, pal, p, route) {
+  const r = route.rail;
   const t = room.time || performance.now() / 1000;
   const riding = p?.rail?.active && p.rail.rail === r;
+  const under = route.kind === 'under';
   const dx = r.x2 - r.x1, dy = r.y2 - r.y1, len = Math.hypot(dx, dy) || 1;
   const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
   const liftU = (u) => r.liftStart + (r.liftEnd - r.liftStart) * clamp(u, 0, 1);
   const ptAt = (u) => ({ x: r.x1 + dx * u, y: r.y1 + dy * u - liftU(u) }); // lifted screen point
   const vis = visibleRect(420);
-  const apex = ptAt(1);
-  // cull the whole feature if neither the rooftop entrance nor the off-map stretch is near
-  const ent = ptAt(0);
+  const apex = ptAt(1), ent = ptAt(0);
+  // cull if neither the entrance nor the off-map stretch is near
   if (Math.min(ent.x, apex.x) > vis.r + 600 || Math.max(ent.x, apex.x) < vis.l - 600 ||
       Math.min(ent.y, apex.y) > vis.b + 600 || Math.max(ent.y, apex.y) < vis.t - 600) return;
 
-  // ── open-sky backdrop around the off-map stretch ──
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const halo = ctx.createRadialGradient(apex.x, apex.y, 40, apex.x, apex.y, 1600);
-  halo.addColorStop(0, hexA('#3a5db0', 0.5));
-  halo.addColorStop(0.42, hexA('#16264f', 0.32));
-  halo.addColorStop(1, 'rgba(8,12,26,0)');
-  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(apex.x, apex.y, 1600, 0, TAU); ctx.fill();
-  // stars scattered across the outer half (deterministic, twinkling)
-  ctx.fillStyle = '#ffffff';
-  for (let i = 0; i < 80; i++) {
-    const u = 0.36 + hsh(i * 1.7) * 0.72;
-    const off = (hsh(i * 3.1) - 0.5) * 1500;
-    const sx = r.x1 + ux * u * len + nx * off;
-    const sy = r.y1 + uy * u * len + ny * off - liftU(u) - (hsh(i * 5.3) - 0.15) * 560;
-    if (sx < vis.l || sx > vis.r || sy < vis.t || sy > vis.b) continue;
-    ctx.globalAlpha = (0.25 + hsh(i * 7) * 0.5) * (0.55 + Math.sin(t * 2 + i) * 0.45);
-    ctx.beginPath(); ctx.arc(sx, sy, hsh(i * 9) < 0.18 ? 2.4 : 1.2, 0, TAU); ctx.fill();
-  }
-  ctx.restore();
+  if (under) drawCavernBackdrop(route, r, t, ux, uy, nx, ny, len, liftU, ptAt, vis);
+  else drawSkyBackdrop(route, r, t, ux, uy, nx, ny, len, liftU, ptAt, vis);
 
-  // ── drifting cloud banks along the outer stretch ──
-  ctx.save();
-  for (let i = 0; i < 9; i++) {
-    const u = 0.42 + (i / 9) * 0.6;
-    const off = ((i % 2) ? 1 : -1) * (210 + hsh(i * 2.2) * 280) + Math.sin(t * 0.3 + i) * 64;
-    const cx = r.x1 + ux * u * len + nx * off, cy = r.y1 + uy * u * len + ny * off - liftU(u) + 36;
-    if (cx < vis.l - 200 || cx > vis.r + 200 || cy < vis.t - 200 || cy > vis.b + 200) continue;
-    ctx.globalAlpha = 0.42; drawCloudPuff(cx, cy, 46 + hsh(i * 4) * 32, '#cfe6ff');
-  }
-  ctx.restore();
-
-  // ── the climbing rail: glow body + white core + outward chevrons ──
+  // ── the rail: glow body + white core + outward chevrons (shared) ──
   ctx.save();
   ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalCompositeOperation = 'lighter';
   const N = 40;
   const trace = () => { ctx.beginPath(); for (let i = 0; i <= N; i++) { const q = ptAt(i / N); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); } };
-  ctx.globalAlpha = riding ? 0.55 : 0.34; ctx.strokeStyle = sky.color; ctx.lineWidth = riding ? 22 : 15; trace(); ctx.stroke();
+  ctx.globalAlpha = riding ? 0.55 : 0.34; ctx.strokeStyle = route.color; ctx.lineWidth = riding ? 22 : 15; trace(); ctx.stroke();
   ctx.globalAlpha = 0.95; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = riding ? 5 : 3.4; trace(); ctx.stroke();
-  ctx.globalAlpha = 0.9; ctx.strokeStyle = sky.color; ctx.lineWidth = 3;
+  ctx.globalAlpha = 0.9; ctx.strokeStyle = route.color; ctx.lineWidth = 3;
   const spacing = 0.085, scroll = (t * 0.24) % spacing;
   for (let u = scroll + 0.05; u < 0.99; u += spacing) {
     const a = ptAt(u), b = ptAt(Math.min(1, u + 0.01));
@@ -523,26 +496,96 @@ function drawSkyway(room, pal, p) {
 
   // ── jewel at the apex (afterglow once taken) ──
   ctx.save(); ctx.translate(apex.x, apex.y); ctx.globalCompositeOperation = 'lighter';
-  if (!sky.taken) {
+  if (!route.taken) {
     const pulse = 0.7 + Math.sin(t * 3) * 0.3;
     ctx.globalAlpha = 0.45 * pulse; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
     for (let i = 0; i < 9; i++) { const a = t * 0.5 + i * TAU / 9; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 76, Math.sin(a) * 76); ctx.stroke(); }
-    ctx.globalAlpha = 0.4; ctx.fillStyle = hexA(sky.color, 0.5); ctx.beginPath(); ctx.arc(0, 0, 42 * pulse, 0, TAU); ctx.fill();
-    drawJewelShape(0, 0, 22, sky.color, t);
+    ctx.globalAlpha = 0.4; ctx.fillStyle = hexA(route.color, 0.5); ctx.beginPath(); ctx.arc(0, 0, 42 * pulse, 0, TAU); ctx.fill();
+    drawJewelShape(0, 0, 22, route.color, t);
   } else {
-    ctx.globalAlpha = 0.22; ctx.fillStyle = hexA(sky.color, 0.3); ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.22; ctx.fillStyle = hexA(route.color, 0.3); ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
   }
   ctx.restore();
 
-  // ── entrance beacon over the launch rooftop (find it from the ground) ──
-  ctx.save(); ctx.translate(ent.x, ent.y); ctx.globalCompositeOperation = 'lighter';
-  const ep = 0.6 + Math.sin(t * 2.4) * 0.4;
-  ctx.globalAlpha = 0.5 * ep; ctx.strokeStyle = sky.color; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.arc(0, 0, 30, 0, TAU); ctx.stroke();
-  ctx.globalAlpha = 0.85; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
-  for (let k = 0; k < 2; k++) { // double chevron pointing up the rail
-    const oy = -k * 13 + 6;
-    ctx.beginPath(); ctx.moveTo(-12, oy + 8 + ux * 0); ctx.lineTo(0, oy - 6); ctx.lineTo(12, oy + 8); ctx.stroke();
+  // ── entrance marker: a rooftop ring (sky) or a dark street pit (underground) ──
+  ctx.save(); ctx.translate(ent.x, ent.y);
+  if (under) {
+    ctx.globalCompositeOperation = 'source-over';
+    const pit = ctx.createRadialGradient(0, 12, 4, 0, 12, 66);
+    pit.addColorStop(0, 'rgba(0,0,0,0.92)'); pit.addColorStop(0.7, 'rgba(5,3,2,0.78)'); pit.addColorStop(1, 'rgba(5,3,2,0)');
+    ctx.fillStyle = pit; ctx.beginPath(); ctx.ellipse(0, 12, 62, 31, 0, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.6 + Math.sin(t * 2.4) * 0.3; ctx.strokeStyle = route.color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(0, 12, 52, 26, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.85; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+    for (let k = 0; k < 2; k++) { const oy = 4 + k * 11; ctx.beginPath(); ctx.moveTo(-11, oy - 6); ctx.lineTo(0, oy + 6); ctx.lineTo(11, oy - 6); ctx.stroke(); }
+  } else {
+    ctx.globalCompositeOperation = 'lighter';
+    const ep = 0.6 + Math.sin(t * 2.4) * 0.4;
+    ctx.globalAlpha = 0.5 * ep; ctx.strokeStyle = route.color; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, 30, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.85; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3;
+    for (let k = 0; k < 2; k++) { const oy = -k * 13 + 6; ctx.beginPath(); ctx.moveTo(-12, oy + 8); ctx.lineTo(0, oy - 6); ctx.lineTo(12, oy + 8); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+// Open-sky backdrop: a glowing halo, twinkling stars, drifting cloud banks.
+function drawSkyBackdrop(route, r, t, ux, uy, nx, ny, len, liftU, ptAt, vis) {
+  const apex = ptAt(1);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(apex.x, apex.y, 40, apex.x, apex.y, 1600);
+  halo.addColorStop(0, hexA('#3a5db0', 0.5)); halo.addColorStop(0.42, hexA('#16264f', 0.32)); halo.addColorStop(1, 'rgba(8,12,26,0)');
+  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(apex.x, apex.y, 1600, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 80; i++) {
+    const u = 0.36 + hsh(i * 1.7) * 0.72, off = (hsh(i * 3.1) - 0.5) * 1500;
+    const sx = r.x1 + ux * u * len + nx * off;
+    const sy = r.y1 + uy * u * len + ny * off - liftU(u) - (hsh(i * 5.3) - 0.15) * 560;
+    if (sx < vis.l || sx > vis.r || sy < vis.t || sy > vis.b) continue;
+    ctx.globalAlpha = (0.25 + hsh(i * 7) * 0.5) * (0.55 + Math.sin(t * 2 + i) * 0.45);
+    ctx.beginPath(); ctx.arc(sx, sy, hsh(i * 9) < 0.18 ? 2.4 : 1.2, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.save();
+  for (let i = 0; i < 9; i++) {
+    const u = 0.42 + (i / 9) * 0.6, off = ((i % 2) ? 1 : -1) * (210 + hsh(i * 2.2) * 280) + Math.sin(t * 0.3 + i) * 64;
+    const cx = r.x1 + ux * u * len + nx * off, cy = r.y1 + uy * u * len + ny * off - liftU(u) + 36;
+    if (cx < vis.l - 200 || cx > vis.r + 200 || cy < vis.t - 200 || cy > vis.b + 200) continue;
+    ctx.globalAlpha = 0.42; drawCloudPuff(cx, cy, 46 + hsh(i * 4) * 32, '#cfe6ff');
+  }
+  ctx.restore();
+}
+
+// Cavern backdrop: a dark mass + dug shaft occluding the city (reads as underground), with
+// warm crystal glints and rock specks.
+function drawCavernBackdrop(route, r, t, ux, uy, nx, ny, len, liftU, ptAt, vis) {
+  const apex = ptAt(1);
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  const cave = ctx.createRadialGradient(apex.x, apex.y, 60, apex.x, apex.y, 1500);
+  cave.addColorStop(0, 'rgba(6,4,3,0.95)'); cave.addColorStop(0.5, 'rgba(9,6,4,0.8)'); cave.addColorStop(0.82, 'rgba(9,6,4,0.36)'); cave.addColorStop(1, 'rgba(9,6,4,0)');
+  ctx.fillStyle = cave; ctx.beginPath(); ctx.arc(apex.x, apex.y, 1500, 0, TAU); ctx.fill();
+  // a dark dug shaft hugging the descending rail (taper from the entrance so the street isn't scarred)
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 24; i++) {
+    const u0 = i / 24, u1 = (i + 1) / 24, a = ptAt(u0), b = ptAt(u1);
+    ctx.globalAlpha = clamp((u0 - 0.04) * 4, 0, 1) * 0.9;
+    ctx.strokeStyle = 'rgba(7,5,4,0.92)'; ctx.lineWidth = 90 + u0 * 150;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 64; i++) {
+    const u = 0.32 + hsh(i * 1.9) * 0.76, off = (hsh(i * 3.7) - 0.5) * 1200;
+    const gx = r.x1 + ux * u * len + nx * off, gy = r.y1 + uy * u * len + ny * off - liftU(u) + (hsh(i * 5.1) - 0.3) * 460;
+    if (gx < vis.l || gx > vis.r || gy < vis.t || gy > vis.b) continue;
+    const lit = hsh(i * 8.3) > 0.7;
+    ctx.globalAlpha = (lit ? 0.5 : 0.18) * (0.6 + Math.sin(t * 2 + i) * 0.4);
+    ctx.fillStyle = lit ? route.color : '#6b4a33';
+    ctx.beginPath(); ctx.arc(gx, gy, lit ? 2.6 : 1.5, 0, TAU); ctx.fill();
   }
   ctx.restore();
 }
@@ -1099,8 +1142,11 @@ function drawFlowTargetBeacons(room, pal, t, vis) {
     } else if (p.kind === 'gem' || p.kind === 'skyCache' || p.kind === 'mysteryVault') {
       ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.72, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.72, 0); ctx.closePath(); ctx.stroke();
     } else if (p.kind === 'skyway') {
-      ctx.strokeStyle = '#bdefff'; // a stack of chevrons pointing skyward (grind off the map up here)
+      ctx.strokeStyle = '#bdefff'; // chevrons pointing skyward (grind off the map up here)
       for (let k = 0; k < 3; k++) { const o = k * 7 - 5; ctx.beginPath(); ctx.moveTo(-r * 0.62, o + r * 0.5); ctx.lineTo(0, o - r * 0.28); ctx.lineTo(r * 0.62, o + r * 0.5); ctx.stroke(); }
+    } else if (p.kind === 'underway') {
+      ctx.strokeStyle = '#ffd9a6'; // chevrons pointing down (grind off the map into the hole)
+      for (let k = 0; k < 3; k++) { const o = k * 7 - 5; ctx.beginPath(); ctx.moveTo(-r * 0.62, o - r * 0.5); ctx.lineTo(0, o + r * 0.28); ctx.lineTo(r * 0.62, o - r * 0.5); ctx.stroke(); }
     } else {
       ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, TAU); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-r * 0.9, 0); ctx.lineTo(r * 0.9, 0); ctx.moveTo(0, -r * 0.9); ctx.lineTo(0, r * 0.9); ctx.stroke();
