@@ -71,6 +71,39 @@ export function tickCombo(raw) {
   }
 }
 
+// ── REDLINE: the flow surge. Dashing, grinding, flow-lanes and kills fill the meter; at
+// full it IGNITES a few seconds of hyperspeed — faster boots, fatter score, the screen gone
+// electric. The reward for never, ever stopping. (HUD meter: overlays.js pulse bar.)
+export const REDLINE = { DUR: 5, SPEED: 1.26, SCORE: 1.6 };
+export function addRedline(amount) {
+  const run = state.run;
+  if (!run || run.redlineT > 0) return; // can't refill mid-surge
+  run.redline = Math.min(1, (run.redline || 0) + amount);
+  if (run.redline >= 1) igniteRedline();
+}
+function igniteRedline() {
+  const run = state.run, room = state.room, p = run?.player;
+  if (!run || !p || !room) return;
+  run.redlineT = REDLINE.DUR; run.redline = 1;
+  p.flowT = Math.max(p.flowT || 0, 0.4);
+  addFloat(room, p.x, p.y - 82, 'REDLINE!', '#ff5d6c', true, 1.55);
+  addFlash(0.4); addShake(0.72);
+  ripple(room, p.x, p.y, '#ff5d6c', 290, 0.72); ripple(room, p.x, p.y, '#ffffff', 170, 0.5);
+  burst(room, p.x, p.y, '#ff5d6c', 42, 470, 0.7, 5.2);
+  sfx('clear'); sfx('pulse');
+}
+export function tickRedline(raw) {
+  const run = state.run; if (!run) return;
+  if (run.redlineT > 0) {
+    run.redlineT = Math.max(0, run.redlineT - raw);
+    run.redline = run.redlineT / REDLINE.DUR;              // the bar drains over the surge
+    if (run.redlineT <= 0) { run.redline = 0; if (run.player && state.room) addFloat(state.room, run.player.x, run.player.y - 58, 'cooldown', '#9eb0cc', false, 0.55); }
+  } else {
+    run.redline = Math.max(0, (run.redline || 0) - raw * 0.10); // gentle decay when not surging
+  }
+}
+export const redlineActive = () => (state.run?.redlineT || 0) > 0;
+
 export function killScore(e) {
   const run = state.run;
   const prevTier = Math.floor(run.combo);
@@ -80,8 +113,10 @@ export function killScore(e) {
   run.comboT = COMBO.WINDOW;
   const pts = Math.floor(e.score * run.combo
     * (run.overdrive ? SCORE.OVERDRIVE_MULT : 1)
-    * (state.room?.mutator?.scoreMult || 1));
+    * (state.room?.mutator?.scoreMult || 1)
+    * (run.redlineT > 0 ? REDLINE.SCORE : 1));
   run.score += pts;
+  addRedline(e.boss ? 0.4 : e.miniboss ? 0.3 : 0.045); // every kill feeds the flow surge
   run.kills++; run.roomKills++;
   state.save.lifetime.kills++;
   state.save.bestiary[e.type] = (state.save.bestiary[e.type] || 0) + 1;

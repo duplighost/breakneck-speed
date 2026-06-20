@@ -177,6 +177,22 @@ export function drawFrame() {
     ctx.fillRect(0, 0, view.W, view.H);
   }
 
+  // REDLINE surge: the screen goes electric — a pulsing hot edge + a thin top/bottom
+  // warning band. Hyperspeed made visible.
+  const redT = state.run?.redlineT || 0;
+  if (redT > 0 && !reduced()) {
+    const now = performance.now() / 1000, pulse = 0.6 + 0.4 * Math.sin(now * 16);
+    const fade = Math.min(1, redT / 0.6);
+    const rg = ctx.createRadialGradient(view.W / 2, view.H / 2, Math.min(view.W, view.H) * 0.28, view.W / 2, view.H / 2, Math.max(view.W, view.H) * 0.72);
+    rg.addColorStop(0, 'rgba(0,0,0,0)');
+    rg.addColorStop(0.7, `rgba(255,70,90,${(0.05 * fade).toFixed(3)})`);
+    rg.addColorStop(1, `rgba(255,60,80,${((0.2 + 0.14 * pulse) * fade).toFixed(3)})`);
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, view.W, view.H);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.7 * fade * pulse; ctx.fillStyle = '#ff5d6c';
+    ctx.fillRect(0, 0, view.W, 5); ctx.fillRect(0, view.H - 5, view.W, 5);
+    ctx.restore();
+  }
   drawEclipse(room); // False Moon's eclipse darkens the field around the moon
   if (state.mode === 'play') drawSpeedStreaks(p); // anime speed-lines at dash/flow velocity
   if (p && state.mode === 'play') drawDangerTriangles(room, p);

@@ -5,7 +5,7 @@ import { norm, clamp } from '../rng.js';
 import { particle, burst, addFloat, ripple } from '../render/particles.js';
 import { addShake, addFlash, hitPause, haptic, slowMo } from './juice.js';
 import { sfx } from '../audio/sfx.js';
-import { killScore } from './score.js';
+import { killScore, addRedline } from './score.js';
 import { hooks } from './items.js';
 import { autoGrant } from './draft.js';
 
@@ -130,6 +130,7 @@ function styleKill(room, run, p, e, kind) {
   }
   if (!label) return;
   run.score += Math.floor((e.score || 60) * 0.5 * (run.combo || 1));
+  addRedline(0.05); // stylish kills feed the surge harder
   addFloat(room, e.x, e.y - (e.r || 16) - 24, label, col, true, 0.72);
 }
 

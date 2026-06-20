@@ -6,6 +6,7 @@ import { clamp, damp, dist, norm } from '../rng.js';
 import { particle, burst, addFloat, ripple } from '../render/particles.js';
 import { addShake, addFlash, slowMo, hitPause, haptic, reduced } from './juice.js';
 import { applyGemReward } from './pickups.js';
+import { addRedline, redlineActive, REDLINE } from './score.js';
 import { sfx } from '../audio/sfx.js';
 import { spawnBullet } from './bullets.js';
 import { damageEnemy } from './combat.js';
@@ -160,7 +161,8 @@ export function updatePlayer(p, move, aim, room, dt) {
   // the sprawl. Riding one lifts the speed cap so the lane actually feels light-speed.
   applyFlowLanes(p, room, move, dt);
   const flowing = (p.flowT || 0) > 0;
-  const surfCap = surf === 'slick' ? 1.22 : surf === 'tar' ? 0.86 : surf === 'charge' ? 1.48 : 1;
+  const red = redlineActive() ? REDLINE.SPEED : 1; // REDLINE surge: hyperspeed boots
+  const surfCap = (surf === 'slick' ? 1.22 : surf === 'tar' ? 0.86 : surf === 'charge' ? 1.48 : 1) * red;
   const maxV = p.speed * surfCap * (p.dashT > 0 ? PLAYER.DASH_SPEED_MULT * (flowing ? 1.58 : 1)
     : flowing ? PLAYER.MAX_SPEED_MULT * 2.25 : PLAYER.MAX_SPEED_MULT);
   let sp = Math.hypot(p.vx, p.vy);
@@ -346,6 +348,11 @@ function updateAnimPose(p, sp, dt) {
 
 function finishPlayerFrame(p, room, sp, dt, movingIntent) {
   updateAnimPose(p, sp, dt);
+  // flow surge meter: grinding fills it fastest, then flow-lanes/dashes — the breakneck
+  // style charges REDLINE (score.js). (No-op while a surge is already burning.)
+  if (p.rail?.active) addRedline(0.42 * dt);
+  else if (p.dashT > 0) addRedline(0.25 * dt);
+  else if ((p.flowT || 0) > 0) addRedline(0.22 * dt);
   const dashLike = p.dashT > 0 || p.rail?.rocketT > 0 || p.air?.dash;
   // trail + afterimages — small motes spawned BEHIND the body (particles draw on
   // top of entities, so a big one here reads as a blob stuck to him; keep it small

@@ -185,9 +185,17 @@ export function updateHud() {
     ui.comboChip.classList.toggle('comboHot', (p.comboTierFx || 0) > 0);
     ui.comboChip.classList.toggle('comboHeal', (p.comboHealFx || 0) > 0);
     ui.comboChip.textContent = (p.comboHealFx || 0) > 0 ? `x${run.combo.toFixed(1)} +♥` : `x${run.combo.toFixed(1)}`;
-    // Dash is always a feel-first move now, so the old readiness meter stays hidden.
-    if (ui.pulseWrap) ui.pulseWrap.style.display = 'none';
-    if (ui.pulseFill) ui.pulseFill.style.width = '100%';
+    // REDLINE flow-surge meter (repurposed pulse bar): fills as you dash/grind/kill, and
+    // glows when it ignites into a hyperspeed surge.
+    if (ui.pulseWrap) {
+      const active = (run.redlineT || 0) > 0;
+      ui.pulseWrap.style.display = 'flex';
+      ui.pulseWrap.classList.toggle('ready', active || (run.redline || 0) >= 0.999);
+      if (ui.pulseFill) {
+        ui.pulseFill.style.width = `${Math.round((run.redline || 0) * 100)}%`;
+        ui.pulseFill.style.background = active ? 'linear-gradient(90deg,#ff5d6c,#ffd36e)' : '';
+      }
+    }
     // The "⇄ BOON READY / x/y" chip is intentionally gone — the reroll still works and
     // surfaces on the draft screen as the "Boon Reroll (R)" button when it's available.
   }
