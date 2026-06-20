@@ -49,6 +49,7 @@ export function drawFrame() {
   ctx.fillStyle = 'rgba(5,7,13,0.22)';
   ctx.fillRect(0, 0, room.w, room.h);
   drawFloorMotion(room, pal);    // the living, moving floor — biome-specific currents
+  drawAtmosphere(room, pal);     // drifting glowing motes — ambient depth/eye-candy
   drawFlowLanes(room, pal, p);   // animated neon boost boulevards over the baked floor
   drawSurfaces(room, pal, 0);    // ground surfaces: slick / tar / charge patches
 
@@ -134,6 +135,20 @@ export function drawFrame() {
   ctx.fillStyle = tint;
   ctx.fillRect(0, 0, view.W, view.H);
 
+  // cinematic colour grade: a gentle vertical dual-tone (cool toward the top, warm toward
+  // the street) via soft-light — adds depth + richness without muddying the action.
+  if (!reduced()) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'soft-light';
+    const grade = ctx.createLinearGradient(0, 0, 0, view.H);
+    grade.addColorStop(0, hexA(pal.accent2, 0.5));
+    grade.addColorStop(0.52, 'rgba(20,22,34,0)');
+    grade.addColorStop(1, hexA(pal.accent, 0.42));
+    ctx.fillStyle = grade;
+    ctx.fillRect(0, 0, view.W, view.H);
+    ctx.restore();
+  }
+
   // Stronger vignette: focuses the eye on the action around the player (camera-centred)
   // and keeps the gigantic sprawl's far corners from competing for attention.
   const vg = ctx.createRadialGradient(view.W / 2, view.H * 0.48, Math.min(view.W, view.H) * 0.20, view.W / 2, view.H / 2, Math.max(view.W, view.H) * 0.74);
@@ -206,11 +221,20 @@ function drawBuilding(room, pal, t) {
   const L = roofLift(t);
   const topY = t.y - L;                  // screen Y of the walkable roof surface
   const skin = t.skin || pal.accent2;
+  const time = room.time || performance.now() / 1000;
   ctx.save();
 
   // ground shadow — longer for taller towers
   ctx.fillStyle = 'rgba(0,0,0,0.42)';
   roundRectPath(ctx, t.x + 10, t.y + t.h - 4, t.w, 18 + L * 0.06, 12); ctx.fill();
+
+  // wet-street neon reflection: the tower's colour bleeds down onto the street in front
+  const reflH = Math.min(150, L * 0.72);
+  const refl = ctx.createLinearGradient(0, t.y + t.h, 0, t.y + t.h + reflH);
+  refl.addColorStop(0, hexA(skin, 0.18)); refl.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = refl;
+  ctx.fillRect(t.x + 8, t.y + t.h + 6, t.w - 16, reflH);
+  ctx.globalCompositeOperation = 'source-over';
 
   // solid block body (roof → ground); the lower band is the visible facade. A vivid
   // skin-coloured crest fades to a deep base so the tower reads as the colourful slab risen.
@@ -220,14 +244,15 @@ function drawBuilding(room, pal, t) {
   body.addColorStop(1, mixHex(pal.bg, '#000000', 0.30));
   ctx.fillStyle = body;
   roundRectPath(ctx, t.x, topY, t.w, t.h + L, 10); ctx.fill();
-  // neon crest band just under the roof — the brightest read of the building's colour
+  // neon crest band just under the roof — the brightest read of the building's colour,
+  // with a slow shimmer so the skyline breathes
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.5; ctx.fillStyle = hexA(skin, 0.5);
+  ctx.globalAlpha = 0.44 + 0.12 * Math.sin(time * 1.1 + t.phase); ctx.fillStyle = hexA(skin, 0.5);
   roundRectPath(ctx, t.x + 2, topY + t.h * 0.5, t.w - 4, Math.max(10, t.h * 0.28), 6); ctx.fill();
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 
   // facade = front cliff band (from below the roof down to the ground)
-  drawFacade(t, skin, pal, topY + t.h * 0.5, t.y + t.h - 4);
+  drawFacade(t, skin, pal, topY + t.h * 0.5, t.y + t.h - 4, time);
 
   // corner pilasters (vertical neon edges) sell the extrusion
   ctx.globalCompositeOperation = 'lighter';
@@ -273,20 +298,22 @@ function drawBuilding(room, pal, t) {
 }
 
 // Two facade texture sets, mixed across the city so towers don't all read the same.
-function drawFacade(t, skin, pal, top, bot) {
+function drawFacade(t, skin, pal, top, bot, time = 0) {
   const h = bot - top; if (h < 14) return;
   ctx.save();
   roundRectPath(ctx, t.x + 2, top, t.w - 4, h, 8); ctx.clip();
   if (t.texSet === 1) {
-    // SET 1 — lit window grid (warm windows punched into the colour)
+    // SET 1 — lit window grid (warm windows punched into the colour, gently twinkling)
     const cols = clamp(Math.floor(t.w / 26), 3, 24);
     const rows = clamp(Math.floor(h / 22), 2, 16);
     const cw = t.w / cols, rh = h / rows;
     const seed = (t.id || 1) * 31.7 + (t.litSeed || 0) * 53.3;
     for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
-      const lit = hsh(seed + c * 7.1 + r * 3.3) > 0.6;
+      const k = hsh(seed + c * 7.1 + r * 3.3);
+      const lit = k > 0.6;
       const wx = t.x + 2 + c * cw + cw * 0.22, wy = top + r * rh + rh * 0.22;
-      ctx.globalAlpha = lit ? 0.5 : 0.15;
+      const tw = lit ? 0.78 + 0.22 * Math.sin(time * (0.8 + k) + (c * 3 + r * 5)) : 1; // window twinkle
+      ctx.globalAlpha = (lit ? 0.5 : 0.15) * tw;
       ctx.fillStyle = lit ? mixHex(skin, '#fff7d8', 0.55) : mixHex(skin, '#000000', 0.4);
       ctx.fillRect(wx, wy, cw * 0.56, rh * 0.5);
     }
@@ -965,6 +992,37 @@ function dist2(x1, y1, x2, y2) {
 function visibleRect(margin = 0) {
   const invS = 1 / (view.scale || 1);
   return { l: cam.x - margin, t: cam.y - margin, r: cam.x + view.W * invS + margin, b: cam.y + view.H * invS + margin };
+}
+
+// Ambient atmosphere: two parallax depths of slow-drifting, twinkling light motes
+// (embers/dust catching the neon). Deterministic over a grid in the visible area, so it's
+// cheap and infinite. Pure background eye-candy under everything that matters.
+function drawAtmosphere(room, pal) {
+  if (reduced() || state.lowFx) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(60);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const layers = [
+    { spacing: 188, size: 1.5, spd: 8, alpha: 0.085, col: pal.accent2 },  // far: small, dim, slow
+    { spacing: 312, size: 2.9, spd: 15, alpha: 0.12, col: pal.accent },    // near: big, bright, fast
+  ];
+  for (const L of layers) {
+    const c0 = Math.floor(vis.l / L.spacing) - 1, c1 = Math.ceil(vis.r / L.spacing) + 1;
+    const r0 = Math.floor(vis.t / L.spacing) - 1, r1 = Math.ceil(vis.b / L.spacing) + 1;
+    for (let cx = c0; cx <= c1; cx++) for (let cy = r0; cy <= r1; cy++) {
+      const h1 = hsh(cx * 73.1 + cy * 19.7), h2 = hsh(cx * 12.3 + cy * 91.7), h3 = hsh(cx * 41.7 + cy * 7.3 + 5.1);
+      const x = cx * L.spacing + h1 * L.spacing;
+      const drift = (t * L.spd * (0.5 + h3)) % L.spacing;
+      const y = cy * L.spacing + h2 * L.spacing - drift;            // slow upward drift, wraps per cell
+      const tw = 0.4 + 0.6 * Math.sin(t * (0.9 + h3 * 1.8) + h1 * 6.28);
+      if (tw < 0.12 || x < vis.l || x > vis.r || y < vis.t || y > vis.b) continue;
+      ctx.globalAlpha = L.alpha * tw;
+      ctx.fillStyle = h3 > 0.82 ? '#ffffff' : L.col;
+      ctx.beginPath(); ctx.arc(x, y, L.size * (0.7 + h3 * 0.6), 0, TAU); ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 function drawFloorMotion(room, pal) {
@@ -1785,6 +1843,16 @@ function drawTitleBg() {
 }
 
 function hexA(hex, a) {
+  // Defensive: hex is the common case, but tolerate hsl()/rgb() so a stray non-hex colour
+  // can never produce an unparseable rgba(NaN,...) that throws inside a gradient stop.
+  if (typeof hex !== 'string' || !hex) return `rgba(255,255,255,${a})`;
+  if (hex[0] !== '#') {
+    const hsl = /^hsla?\(([^)]+?)(?:,\s*[\d.]+)?\)$/.exec(hex);
+    if (hsl) return `hsla(${hsl[1]},${a})`;
+    const rgb = /^rgba?\(([^)]+?)(?:,\s*[\d.]+)?\)$/.exec(hex);
+    if (rgb) return `rgba(${rgb[1]},${a})`;
+    return hex;
+  }
   const h = hex.replace('#', '');
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r},${g},${b},${a})`;

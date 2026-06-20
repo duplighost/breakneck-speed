@@ -3,7 +3,7 @@
 
 export const TAU = Math.PI * 2;
 export const SAVE_KEY = 'oneRoomNoMoon.v1';
-export const VERSION = '2.5.0-breakneck-skyline';
+export const VERSION = '2.6.0-breakneck-skyline';
 
 // px a platform (level 1) rises; per-building height = TIER_LIFT * tier.rise. Shared by
 // the generator (roomRoller) and the renderer (draw) so building heights stay in sync.
@@ -100,7 +100,7 @@ export const FX = {
   HIT_PAUSE: { shot: 8, chain: 12, dash: 11, pulse: 24, kill: 18, dashKill: 26, boss: 48, hurt: 60 }, // ms
 };
 
-export const BLOOM = { ALPHA: 0.20, FILTER: 'blur(11px) saturate(1.16)' };
+export const BLOOM = { ALPHA: 0.26, FILTER: 'blur(13px) saturate(1.26)' };
 
 export const ANNEX = { CHANCE: 0.48, AMBUSH: 0.45 };
 

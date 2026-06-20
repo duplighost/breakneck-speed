@@ -740,6 +740,22 @@ function wallSlab(x, y, w, h) {
 // rooftop crown. Gameplay level stays 1 (you grind/vent/ramp up to the roof); only the
 // drawn height varies, so this never destabilises the binary ground/roof level system.
 const BUILDING_CROWNS = ['mast', 'ring', 'heli', 'billboard', 'garden', 'mast', 'none'];
+// District colours are `hsl(...)` strings, but the building renderer's mix()/hexA() helpers
+// only parse hex — feed them hsl and mix() silently goes black while hexA() yields an
+// unparseable rgba(NaN,...) that throws inside a gradient. So bake a real hex skin here.
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const ch = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))).toString(16).padStart(2, '0');
+  return `#${ch(0)}${ch(8)}${ch(4)}`;
+}
+function colorToHex(c, fallback) {
+  if (!c) return fallback;
+  if (c[0] === '#') return c;
+  const m = /hsl\(\s*([\d.]+)[, ]+([\d.]+)%[, ]+([\d.]+)%/.exec(c);
+  return m ? hslToHex(+m[1], +m[2], +m[3]) : fallback;
+}
 function decorateBuilding(room, rng, tier, districtId) {
   const d = districtId != null ? (room.districts || []).find(x => x.id === districtId) : null;
   const tallKind = d && (d.kind === 'arcology' || d.kind === 'reactor' || d.kind === 'data' || d.kind === 'exit' || d.kind === 'plaza');
@@ -747,7 +763,7 @@ function decorateBuilding(room, rng, tier, districtId) {
   let rise = rand(rng, 1.0, 1.5) * (tallKind ? 1.18 : 1);
   if (chance(rng, 0.26)) rise = rand(rng, 1.7, 2.35);          // hero towers punch the skyline
   tier.rise = clamp(rise, 0.95, 2.5);
-  tier.skin = d?.color || room.biome.pal.accent2;               // the colorful slab's hue, risen
+  tier.skin = colorToHex(d?.color, room.biome.pal.accent2);     // the colorful slab's hue, risen (as hex)
   tier.texSet = chance(rng, tallKind ? 0.62 : 0.45) ? 1 : 0;    // two facade treatments, mixed
   tier.crown = tier.rise > 1.7 ? pick(rng, ['mast', 'ring', 'billboard']) : pick(rng, BUILDING_CROWNS);
   tier.litSeed = rng();                                         // deterministic window lighting
