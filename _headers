@@ -1,0 +1,9 @@
+# Netlify cache rules. The entry HTML and the JS module graph are NOT content-hashed,
+# so a browser/CDN could otherwise keep serving an old build after you redeploy — the
+# classic "my phone still shows the old version" problem. Force them to revalidate every
+# load (ETag → tiny 304 when unchanged), so a fresh deploy always wins immediately.
+# Static art in /assets keeps normal caching.
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+/src/*
+  Cache-Control: public, max-age=0, must-revalidate
