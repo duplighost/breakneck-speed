@@ -61,6 +61,8 @@ export function updateEnemies(room, dt) {
     e.tele = Math.max(0, e.tele - dt);
     e.hopCd = Math.max(0, (e.hopCd || 0) - dt);
     if (e.slowTimer > 0) { e.slowTimer -= dt; if (e.slowTimer <= 0) e.slowMul = 1; }
+    if (e.miniboss) e.introT = Math.max(0, (e.introT || 0) - dt);
+    const minIntro = !!(e.miniboss && (e.introT || 0) > 0); // elite strut-in: holds + untouchable
 
     const to = norm(p.x - e.x, p.y - e.y);
     const d = to.m;
@@ -74,7 +76,7 @@ export function updateEnemies(room, dt) {
     }
     let ax = 0, ay = 0, lambda = 6.2;
 
-    if (e.stun <= 0 && (e.boss ? updateBoss(e, room, p, to, d, dt) : true)) {
+    if (!minIntro && e.stun <= 0 && (e.boss ? updateBoss(e, room, p, to, d, dt) : true)) {
       switch (e.boss ? 'none' : e.type) {
         case 'skitter': {
           const wig = 1.08 + Math.sin(e.phase * 5) * 0.12;
@@ -207,6 +209,10 @@ export function updateEnemies(room, dt) {
       }
     }
 
+    if (e.miniboss) {
+      if (minIntro) { e.vx = damp(e.vx, 0, 5, dt); e.vy = damp(e.vy, 0, 5, dt); } // hold, coiled
+      else updateMinibossPattern(e, room, p, to, d, dt);
+    }
     e.x += e.vx * dt; e.y += e.vy * dt;
     if (e.offRoute) {
       e.level = e.offRoute.kind === 'under' ? 0 : 1; // off-map sentinels hold the rail (no bounds clamp / no floor relevel)
@@ -219,7 +225,7 @@ export function updateEnemies(room, dt) {
     }
 
     if (p.inv <= 0 && e.level === p.level && dist(e.x, e.y, p.x, p.y) < e.r + p.r + 2) {
-      hurtPlayer(e.boss ? 2 : 1, e.x, e.y, 'contact');
+      hurtPlayer(e.boss || e.miniboss ? 2 : 1, e.x, e.y, 'contact');
       const k = norm(e.x - p.x, e.y - p.y);
       e.vx += k.x * 90; e.vy += k.y * 90;
     }
@@ -293,6 +299,67 @@ export function spawnTelegraphed(room, type, x, y, delay = 0.55, captain = null)
   room.spawnQueue.push(q);
   return q;
 }
+
+// ── Mini-bosses: elite, telegraphed, HP-barred mid-room encounters (data/enemies MINIBOSSES).
+// Built from a tough host enemy (so it reuses the host AI in updateEnemies) + buffs + a
+// signature attack pattern. Kept here (not bosses.js) so it shares makeEnemy/fire helpers
+// without an import cycle.
+export function makeMiniBoss(def, room, x, y) {
+  const e = makeEnemy(def.host, x, y, room);            // host AI + round-scaled base HP
+  e.miniboss = true; e.miniId = def.id; e.display = def.title; e.miniName = def.title;
+  e.pattern = def.pattern;
+  e.hp *= def.hp; e.maxHp = e.hp;
+  e.r *= def.r; e.speed *= def.speed; e.color = def.color;
+  e.score = Math.floor(e.score * 4.2);
+  e.introT = 0.8; e.invulnT = 0.8; e.patternCd = 1.5;   // brief untouchable strut-in
+  return e;
+}
+
+export function spawnMiniBoss(room, def, x, y) {
+  const e = makeMiniBoss(def, room, x, y);
+  room.enemies.push(e);
+  slowMo(0.3); addFlash(0.3); addShake(0.55); sfx('telegraph');
+  ripple(room, x, y, e.color, 210, 0.75); ripple(room, x, y, '#ffffff', 130, 0.5);
+  burst(room, x, y, e.color, 34, 380, 0.7, 4.4);
+  addFloat(room, x, y - e.r - 36, '⚠ ELITE: ' + def.title.toUpperCase(), '#ffd36e', true, 1.25);
+  return e;
+}
+
+// Signature attack, fired on a cooldown once the strut-in finishes. Reuses the boss bullet
+// helpers; escalates below 50% HP. Movement still comes from the host AI in updateEnemies.
+function updateMinibossPattern(e, room, p, to, d, dt) {
+  e.patternCd = Math.max(0, (e.patternCd || 0) - dt);
+  if (e.patternCd > 0) return;
+  const idx = room.idx, enraged = e.hp / e.maxHp < 0.5;
+  switch (e.pattern) {
+    case 'slamRings':
+      e.patternCd = enraged ? 1.9 : 2.7; e.vx *= 0.3; e.vy *= 0.3;
+      fireEnemyRing(room, e, enraged ? 16 : 11, 232 + idx * 8, 3.5, e.color, e.phase * 0.4);
+      if (enraged) fireEnemyRing(room, e, 9, 180, 3.0, '#ffffff', e.phase * 0.4 + 0.3);
+      ripple(room, e.x, e.y, '#ffffff', 130, 0.42); addShake(0.3); sfx('telegraph');
+      break;
+    case 'dashVolley':
+      e.patternCd = enraged ? 1.5 : 2.2; e.vx += to.x * 540; e.vy += to.y * 540;
+      fireEnemyBurst(room, e, p.x, p.y, enraged ? 5 : 3, 0.5, 330 + idx * 10, 3.2, e.color);
+      sfx('telegraph');
+      break;
+    case 'orbitRing':
+      e.patternCd = enraged ? 2.0 : 2.9;
+      fireEnemyRing(room, e, enraged ? 18 : 13, 206 + idx * 8, 3.6, e.color, e.phase);
+      fireEnemyRing(room, e, enraged ? 11 : 8, 168, 3.0, '#ffffff', e.phase + 0.42);
+      break;
+    case 'crossfire':
+      e.patternCd = enraged ? 1.7 : 2.5;
+      for (let k = 0; k < (enraged ? 4 : 3); k++) fireEnemyBurst(room, e, p.x, p.y, 1, 0, 360, 3.0, e.color);
+      fireEnemyRing(room, e, enraged ? 12 : 8, 200, 3.2, e.color, e.phase * 0.5);
+      break;
+    default: // chargeBurst
+      e.patternCd = enraged ? 1.7 : 2.5; e.vx += to.x * 660; e.vy += to.y * 660;
+      fireEnemyBurst(room, e, p.x, p.y, enraged ? 6 : 4, 0.7, 300, 3.2, e.color);
+      sfx('telegraph');
+  }
+}
+export { updateMinibossPattern };
 
 export function updateSpawnQueue(room, dt) {
   for (let i = room.spawnQueue.length - 1; i >= 0; i--) {

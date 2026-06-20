@@ -35,6 +35,18 @@ export const CAPTAINS = [
   { id: 'saintless',       title: 'Saintless',       hosts: ['hexer', 'myrmidon'],  hp: 1.42, speed: 1.00, color: '#c8ffdf', onDeath: 'slowFog' },
 ];
 
+// Mini-bosses — a tier above captains, below the round bosses. A telegraphed elite that
+// strides into a normal room with an HP bar, a signature attack, and a big reward. Built
+// from a tough host enemy (so it reuses the host AI) + a signature pattern + buffs. `hp`
+// multiplies the host's already round-scaled HP; tuned to die fast under aggression.
+export const MINIBOSSES = [
+  { id: 'warox',   title: 'War-Ox',         host: 'brute',    hp: 3.4, r: 1.7,  speed: 1.12, color: '#ff7a4d', pattern: 'slamRings' },
+  { id: 'duelist', title: 'Crown-Duelist',  host: 'myrmidon', hp: 2.7, r: 1.5,  speed: 1.36, color: '#ffd36e', pattern: 'dashVolley' },
+  { id: 'cantor',  title: 'High Antiphon',  host: 'hexer',    hp: 2.8, r: 1.58, speed: 1.06, color: '#9fffe0', pattern: 'orbitRing' },
+  { id: 'breaker', title: 'Gate-Breaker',   host: 'charger',  hp: 3.0, r: 1.62, speed: 1.30, color: '#ff5c91', pattern: 'chargeBurst' },
+  { id: 'warden',  title: 'Sub-Warden',     host: 'turret',   hp: 3.2, r: 1.6,  speed: 1.0,  color: '#c494ff', pattern: 'crossfire' },
+];
+
 export const BESTIARY = {
   skitter:  'No Moon skitter logic in arcade shoes. Fast, rude, beautifully chewable.',
   gunner:   'A little shrine-gunner that keeps its distance and spits censer-fire.',

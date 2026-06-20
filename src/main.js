@@ -13,7 +13,8 @@ import {
   wireBgmButton, setMenu, hideOverlays, updateHud, setSfxLabels,
 } from './ui/overlays.js';
 import { updatePlayer } from './systems/player.js';
-import { updateEnemies, updateSpawnQueue, makeEnemy } from './systems/enemies.js';
+import { updateEnemies, updateSpawnQueue, makeEnemy, spawnMiniBoss } from './systems/enemies.js';
+import { MINIBOSSES } from './data/enemies.js';
 import { updateBullets } from './systems/bullets.js';
 import { updateHazards } from './systems/hazards.js';
 import { updatePickups } from './systems/pickups.js';
@@ -209,6 +210,12 @@ function installDebug(actions) {
       return window.oneRoomDebug.state();
     },
     grant: (id) => { grantItem(id, 'debug'); return state.run?.player.modules; },
+    miniboss: (i = 0) => {
+      const room = state.room; if (!room) return null;
+      const def = MINIBOSSES[((i % MINIBOSSES.length) + MINIBOSSES.length) % MINIBOSSES.length];
+      const e = spawnMiniBoss(room, def, room.w * 0.5, room.h * 0.42);
+      return { id: e.miniId, name: e.miniName, hp: Math.round(e.hp) };
+    },
     // art inspection: a frozen row of one of each enemy type
     lineup: () => {
       const room = state.room; if (!room) return null;

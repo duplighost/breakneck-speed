@@ -918,6 +918,7 @@ export function tryDash(dx = null, dy = null, move = null) {
   }
   const n = norm(dx, dy);
   if (n.m < 0.08) return;
+  p._dashKills = 0; // fresh dash → reset the multi-cut "SLICE ×N" counter
 
   // Rails: dash along the rail to rocket; dash away to cut off into a normal dash.
   if (p.rail?.active) {

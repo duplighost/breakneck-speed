@@ -7,6 +7,7 @@ import { addShake, addFlash, hitPause, haptic, slowMo } from './juice.js';
 import { sfx } from '../audio/sfx.js';
 import { killScore } from './score.js';
 import { hooks } from './items.js';
+import { autoGrant } from './draft.js';
 
 export function damageEnemy(e, dmg, kx = 0, ky = 0, kind = 'shot') {
   if (e.hp <= 0) return;
@@ -73,7 +74,7 @@ export function killEnemy(e, kind = 'shot', staggered = false) {
     p.inv = Math.max(p.inv || 0, 0.22);
   }
   // spark scatter (meta currency)
-  const n = (e.boss ? 24 : (e.captain ? 8 : 3 + Math.floor(Math.random() * 3)))
+  const n = (e.boss ? 24 : e.miniboss ? 16 : (e.captain ? 8 : 3 + Math.floor(Math.random() * 3)))
     + (room.mutator?.sparkBonus || 0);
   for (let i = 0; i < n; i++) {
     room.pickups.push({
@@ -89,6 +90,9 @@ export function killEnemy(e, kind = 'shot', staggered = false) {
   // "pop"; anything else the standard burst.
   if (e.boss) {
     bossDeathFX(room, e);
+  } else if (e.miniboss) {
+    minibossDeathFX(room, e);
+    grantMinibossReward(room, p, e);
   } else if (kind === 'dash') {
     dashKillPop(room, e, p);
     sfx('kill'); sfx('break'); // shatter crunch layered on the kill chime
@@ -103,12 +107,52 @@ export function killEnemy(e, kind = 'shot', staggered = false) {
     ripple(room, e.x, e.y, room.biome.pal.accent3, 70, 0.32);
     addFloat(room, e.x, e.y - (e.r || 16) - 10, '✕', '#ffffff', false, 0.4);
   }
+  // STYLE: reward the signature moves — grinding, airborne, and multi-cut kills — with a
+  // callout + bonus points so the breakneck/vertical loop pays you for flowing.
+  if (!e.boss) styleKill(room, run, p, e, kind);
   // mowing a room down should CRESCENDO — rapid consecutive kills escalate with
   // callouts + juice (the dash loop is the whole game; make it sing). Boss death is
   // its own climax, so it's excluded.
   if (!e.boss) killChainFlourish(room, run, e);
   if (e.captainDeath) e.captainDeath(e);
   hooks.run('onKill', e);
+}
+
+// Style payout for killing in motion. Rail/air kills + multi-cut dashes get a callout and
+// bonus points scaled by the live combo — the loop pays you for never stopping.
+function styleKill(room, run, p, e, kind) {
+  let label = null, col = '#bdfcff';
+  if (p.rail?.active) { label = p.rail.kind === 'escape' ? 'EXPRESS KILL' : 'RAIL KILL'; col = '#ffce5a'; }
+  else if (p.air) { label = 'AIR KILL'; col = '#9fe8ff'; }
+  if (kind === 'dash') {
+    p._dashKills = (p._dashKills || 0) + 1;
+    if (p._dashKills >= 2) { label = 'SLICE ×' + p._dashKills; col = '#ffe24a'; }
+  }
+  if (!label) return;
+  run.score += Math.floor((e.score || 60) * 0.5 * (run.combo || 1));
+  addFloat(room, e.x, e.y - (e.r || 16) - 24, label, col, true, 0.72);
+}
+
+// Mini-boss death: a mid-tier climax between a normal kill and the full boss wipe.
+function minibossDeathFX(room, e) {
+  slowMo(0.42); addFlash(0.42); addShake(0.7); hitPause('boss');
+  burst(room, e.x, e.y, e.color, 40, 420, 0.8, 5);
+  burst(room, e.x, e.y, '#ffffff', 20, 260, 0.6, 3.6);
+  ripple(room, e.x, e.y, '#ffffff', 260, 0.85);
+  ripple(room, e.x, e.y, e.color, 180, 0.7);
+  for (const b of room.bullets) if (b.owner === 'enemy' && Math.hypot(b.x - e.x, b.y - e.y) < 360) b.life = 0;
+  addFloat(room, e.x, e.y - (e.r || 24) - 30, 'ELITE DOWN', '#ffd36e', true, 1.4);
+  sfx('kill'); sfx('clear'); sfx('break');
+}
+
+// Mini-boss reward: a visible heart, a spark shower (handled above), a power-up graft, and
+// a full dash refund + flow so you rocket straight out of the kill.
+function grantMinibossReward(room, p, e) {
+  if (p.hp < p.maxHp + 4) room.pickups.push({ type: 'heart', x: e.x, y: e.y, vx: 0, vy: 0, r: 11, life: 12 });
+  autoGrant();
+  p.dashCd = 0;
+  p.flowT = Math.max(p.flowT || 0, 0.5);
+  p.inv = Math.max(p.inv || 0, 0.3);
 }
 
 // Kill-chain crescendo. Consecutive kills inside a short window stack a counter; each

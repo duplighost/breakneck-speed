@@ -5,8 +5,8 @@
 import { state } from '../state.js';
 import { CAPS, DIRECTOR } from '../config.js';
 import { clamp, dist, rand, randi, weightedPick, chance } from '../rng.js';
-import { ENEMY_TYPES, POOL_WEIGHTS, CAPTAINS } from '../data/enemies.js';
-import { spawnTelegraphed } from './enemies.js';
+import { ENEMY_TYPES, POOL_WEIGHTS, CAPTAINS, MINIBOSSES } from '../data/enemies.js';
+import { spawnTelegraphed, spawnMiniBoss } from './enemies.js';
 import { makeBoss } from './bosses.js';
 import { addFloat } from '../render/particles.js';
 import { addPulseHazard, addSlowFog } from './hazards.js';
@@ -226,6 +226,22 @@ export function buildWaves(room, rng) {
     s.captain = (e) => applyCaptain(e, affix);
     promoted++;
   }
+
+  maybeRollMiniBoss(room, rng);
+}
+
+// Roll a mid-room ELITE: a telegraphed mini-boss strides in a few seconds into the fight
+// (or as soon as the room is nearly clear), with an HP bar and a big reward on death.
+function maybeRollMiniBoss(room, rng) {
+  if (room.bossId || room.round < 3 || !MINIBOSSES.length) return;
+  const idx = room.idx;
+  const chanceMB = idx <= 1 ? 0 : idx <= 4 ? 0.34 : idx <= 7 ? 0.42 : 0.5;
+  if (!chance(rng, (chanceMB + (room.mutator?.eliteBonus || 0)))) return;
+  const def = MINIBOSSES[Math.floor(rng() * MINIBOSSES.length)];
+  // a spot toward the upper-middle of the city, clear of the low spawn corner
+  const mx = clamp(room.w * rand(rng, 0.34, 0.66), room.wall + 200, room.w - room.wall - 200);
+  const my = clamp(room.h * rand(rng, 0.28, 0.5), room.wall + 200, room.h - room.wall - 200);
+  room.pendingWaves.push({ at: rand(rng, 3.4, 5.6), orWhenLeft: 1, fired: false, miniboss: def, mx, my });
 }
 
 export function applyCaptain(e, affix) {
@@ -252,7 +268,9 @@ export function tickDirector(room, dt) {
       (wave.orWhenLeft != null && room.time > 2.2 && room.enemies.length + room.spawnQueue.length <= wave.orWhenLeft);
     if (!due) continue;
     wave.fired = true;
-    if (wave.spawns) {
+    if (wave.miniboss) {
+      spawnMiniBoss(room, wave.miniboss, wave.mx, wave.my);
+    } else if (wave.spawns) {
       for (const s of wave.spawns) spawnTelegraphed(room, s.type, s.x, s.y, DIRECTOR.TELEGRAPH + s.delay, s.captain);
     } else if (wave.list?.length) {
       const rng = Math.random;

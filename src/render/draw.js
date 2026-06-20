@@ -106,6 +106,7 @@ export function drawFrame() {
     if (r.lift) { ctx.save(); ctx.translate(0, -r.lift); r.draw(); ctx.restore(); }
     else r.draw();
   }
+  drawMinibossBars(room, pal);  // floating HP bar + name over each elite
 
   drawAnnexCurtain(room, pal); // top veil hides any accidental pre-open contents
   drawLanesOver(room);
@@ -214,6 +215,32 @@ function drawTiers(room, pal) {
   for (const t of room.tiers) {
     if (t.x + t.w < vis.l || t.x > vis.r || t.y + t.h < vis.t || t.y - roofLift(t) > vis.b) continue;
     drawBuilding(room, pal, t);
+  }
+}
+
+// Floating elite HP bar + name, drawn in world space above each mini-boss (lifted to its
+// roof if it's up top). Distinct from the boss top-bar so a normal room still reads clean.
+function drawMinibossBars(room, pal) {
+  for (const e of room.enemies) {
+    if (!e.miniboss || e.hp <= 0) continue;
+    const lift = liftAt(room, e.x, e.y, e.level);
+    const cy = e.y - e.r - 16 - lift, frac = clamp(e.hp / e.maxHp, 0, 1);
+    const w = Math.max(74, e.r * 2.8);
+    ctx.save();
+    ctx.globalAlpha = 0.94; ctx.fillStyle = '#ffffff';
+    ctx.font = '700 15px Inter, system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((e.miniName || 'ELITE').toUpperCase(), e.x, cy - 7);
+    ctx.globalAlpha = 0.72; ctx.fillStyle = 'rgba(2,4,9,0.72)';
+    roundRectPath(ctx, e.x - w / 2 - 2, cy - 2, w + 4, 9, 4); ctx.fill();
+    const grad = ctx.createLinearGradient(e.x - w / 2, 0, e.x + w / 2, 0);
+    grad.addColorStop(0, e.color); grad.addColorStop(1, mixHex(e.color, '#ffffff', 0.4));
+    ctx.globalAlpha = 0.97; ctx.fillStyle = grad;
+    roundRectPath(ctx, e.x - w / 2, cy, w * frac, 5, 2.5); ctx.fill();
+    if ((e.introT || 0) > 0) {
+      ctx.globalAlpha = 0.5 + Math.sin((room.time || 0) * 20) * 0.3; ctx.strokeStyle = '#ffd36e'; ctx.lineWidth = 2;
+      roundRectPath(ctx, e.x - w / 2 - 3, cy - 3, w + 6, 11, 5); ctx.stroke();
+    }
+    ctx.restore();
   }
 }
 
