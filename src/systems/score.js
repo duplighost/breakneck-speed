@@ -136,6 +136,7 @@ export function killScore(e) {
   const prevTier = Math.floor(run.combo);
   run.combo = Math.min(COMBO.CAP, run.combo + (e.boss ? COMBO.PER_BOSS : e.miniboss ? 0.7 : COMBO.PER_KILL));
   const tier = Math.floor(run.combo);
+  if (run.combo > (run.bestCombo || 1)) run.bestCombo = run.combo; // run-long best, for the recap
   if (tier > prevTier && tier >= 2) comboMilestone(tier, e);
   run.comboT = COMBO.WINDOW;
   const pts = Math.floor(e.score * run.combo

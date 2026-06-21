@@ -50,6 +50,7 @@ export function newRun(seedText = Date.now()) {
     seed, seedText: String(seedText), rng: mulberry32(seed),
     round: 0, score: 0, combo: 1, comboT: 0,
     kills: 0, roomKills: 0, streak: 0, streakT: 0,
+    bestCombo: 1, sRanks: 0, roomStyle: 0,   // run-long STYLE RANK tallies (death-screen recap)
     redline: 0, redlineT: 0,   // flow-surge meter (0-1) + active hyperspeed timer
     overdrive: false, won: false,
     startedAt: Date.now(), bags: {},

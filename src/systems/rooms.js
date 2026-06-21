@@ -127,7 +127,7 @@ export function clearRoom(room) {
   if (grade === 'S' || grade === 'A') {
     ripple(room, p.x, p.y, gcol, grade === 'S' ? 300 : 220, grade === 'S' ? 0.7 : 0.5);
     sfx('perfect');
-    if (grade === 'S') { addFlash(0.32); state.save.lifetime.sRanks = (state.save.lifetime.sRanks || 0) + 1; }
+    if (grade === 'S') { addFlash(0.32); state.run.sRanks = (state.run.sRanks || 0) + 1; state.save.lifetime.sRanks = (state.save.lifetime.sRanks || 0) + 1; }
   }
   for (let i = 0; i < 50; i++) {
     const a = (i / 50) * Math.PI * 2, rr = 40 + Math.random() * 170;
@@ -258,6 +258,7 @@ export function die() {
     score: Math.floor(run.score), round: run.round,
     best: state.save.bestScore, bestRound: state.save.bestRound,
     kills: run.kills,
+    bestCombo: run.bestCombo || 1, sRanks: run.sRanks || 0,
     title: DEATH_LINES[Math.floor(Math.random() * DEATH_LINES.length)],
   }, () => startRun());
 }

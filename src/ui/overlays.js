@@ -82,9 +82,12 @@ export function showDeath(stats, onRestart) {
   const menu = menuRef;
   const buttons = [['Run it back', onRestart]];
   if (menu) buttons.push(['Shrine', () => showShrine(menu, true)], ['Codex', () => showCodex(menu, true)]);
+  const styleLine = (stats.bestCombo || stats.sRanks)
+    ? ` · best ×${(stats.bestCombo || 1).toFixed(1)} combo${stats.sRanks ? ` · ${stats.sRanks} S-rank${stats.sRanks > 1 ? 's' : ''}` : ''}`
+    : '';
   showOverlay(
     stats.title || 'The boon boots remain.',
-    `Score ${stats.score.toLocaleString()} · round ${stats.round} · ${stats.kills} marks.`,
+    `Score ${stats.score.toLocaleString()} · round ${stats.round} · ${stats.kills} marks${styleLine}.`,
     buttons,
     `best ${Math.floor(stats.best).toLocaleString()} · round ${stats.bestRound} · ✦ ${(state.save.sparks || 0).toLocaleString()} sparks`,
   );
