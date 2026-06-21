@@ -161,6 +161,8 @@ function targetIntensity() {
   const combo = run.combo || 1;
   s += Math.min(0.30, ((combo - 1) / 13) * 0.30);       // COMBO cranks the arrangement
   if (room.enemies && room.enemies.some(e => e.boss)) s += 0.16;
+  if (room.enemies && room.enemies.some(e => e.miniboss)) s += 0.14; // elite on the field
+  if ((run.redlineT || 0) > 0) s += 0.26;               // REDLINE surge cranks the arrangement
   if (run.overdrive) s += 0.08;
   if (run.player && run.player.hp <= 1) s += 0.08;      // tension when near death
   if (room.cleared) s -= 0.22;                          // victory lap exhales
