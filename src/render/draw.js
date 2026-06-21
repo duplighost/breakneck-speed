@@ -70,6 +70,7 @@ export function drawFrame() {
   drawDistrictHolos(room, pal, p); // floating neighborhood-name holograms
   drawSurfaces(room, pal, 1);    // rooftop surfaces, drawn onto the platform tops
   drawSkyRails(room, pal, p);
+  drawRings(room, pal, p);        // collectible neon rings strung along the rails
   drawOffRoutes(room, pal, p);
   drawSkyLife(room, pal, p);      // flying vehicles + sweeping searchlights high over the city
   drawEscapeRail(room, pal, p);
@@ -102,8 +103,11 @@ export function drawFrame() {
     renderables.push({ y: e.y + e.r, lv: e.level || 0, lift: eLift, draw: () => drawEnemy(ctx, e, room) });
   }
   if (p && !p.dead) {
-    const onRoute = p.rail?.active && p.rail.rail?.route;
-    const pLift = (onRoute ? skywayLift(p.rail.rail, p.rail.u || 0) : liftAt(room, p.x, p.y, p.level)) + (p.airZ || 0);
+    const rr = p.rail?.active && p.rail.kind === 'sky' ? p.rail.rail : null;
+    const baseLift = rr?.route ? skywayLift(rr, p.rail.u || 0)        // off-route: climbing height
+      : rr ? TIER_LIFT * (rr.rise || 1)                              // normal sky rail: ride at rail height
+        : liftAt(room, p.x, p.y, p.level);                           // on foot / rooftop
+    const pLift = baseLift + (p.airZ || 0);
     renderables.push({ y: p.y + p.r + 6, lv: p.level || 0, lift: pLift, draw: () => drawPlayer(ctx, p, room) });
   }
   renderables.sort((a, b) => (a.lv - b.lv) || (a.y - b.y));
@@ -671,6 +675,31 @@ function drawJewelShape(x, y, s, col, t) {
   ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.95; ctx.beginPath(); ctx.arc(0, -s * 0.1, s * 0.18, 0, TAU); ctx.fill();
   ctx.restore();
 }
+
+// Collectible rings strung along the grindable rails — coin-spin foreshortening + glow,
+// lifted to the rail's height. Collected ones vanish (ring.taken).
+function drawRings(room, pal, p) {
+  if (state.lowFx || !room.rings || !room.rings.length) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(80);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const ring of room.rings) {
+    if (ring.taken) continue;
+    if (ring.x < vis.l || ring.x > vis.r || ring.y < vis.t || ring.y > vis.b) continue;
+    const lift = (ring.level || 0) ? TIER_LIFT * (ring.rise || 1) : 0;
+    const x = ring.x, y = ring.y - lift, spin = t * 3.5 + ring.phase;
+    const ry = Math.max(2.5, 12 * Math.abs(Math.cos(spin)));
+    ctx.globalAlpha = 0.7 + 0.25 * Math.sin(t * 5 + ring.phase);
+    ctx.strokeStyle = '#ffce5a'; ctx.lineWidth = 3.2; ctx.shadowColor = '#ffce5a'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.ellipse(x, y, 12, ry, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.55; ctx.strokeStyle = '#fff7d8'; ctx.lineWidth = 1.4; ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.ellipse(x, y, 7, Math.max(1.4, ry * 0.55), 0, 0, TAU); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
 function drawOffRoutes(room, pal, p) {
   for (const route of room.offRoutes || []) drawOffRoute(room, pal, p, route);
 }

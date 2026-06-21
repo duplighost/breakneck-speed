@@ -83,7 +83,7 @@ export function rollRoom(run, round) {
     biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId,
     floorplanId: 'none', openings: [], sanctum: null, tiers: [], vents: [], setpieces: [],
     surfaces: [], escapeRail: null,
-    districts: [], flowLanes: [], skyRails: [], skyways: [], offRoutes: [], signs: [], traffic: [], waypoints: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
+    districts: [], flowLanes: [], skyRails: [], skyways: [], offRoutes: [], rings: [], signs: [], traffic: [], waypoints: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
     weather: pick(rng, ['rain', 'rain', 'fog', 'snow', 'clear', 'clear']), // drawn in draw.js (rain/fog/snow)
     // XL city-scale sprawl — bigger than either fork. Density (cover, rooftops, rails,
     // surfaces, landmarks, enemy budget) all scale with area below so it stays packed.
@@ -184,6 +184,7 @@ export function rollRoom(run, round) {
   seedVerticality(room, rng, px, py, portalX, portalY, partitioned);
   if (room.tiers.length) seedVents(room, rng, px, py, portalX, portalY);
   if (room.tiers.length) seedSkyRails(room, rng);
+  if (room.skyRails.length) seedRailRings(room, rng);
   if (!bossId && room.tiers.length) seedHighGroundRewards(room, rng);
   seedSurfaces(room, rng, px, py, portalX, portalY);
   seedDistrictLandmarks(room, rng, px, py, portalX, portalY);
@@ -891,6 +892,25 @@ function ventClear(room, x, y, pad) {
     }
   }
   return true;
+}
+
+// Sonic-style collectible rings strung along the grindable sky rails — grind the rooftops
+// to scoop them up for score + flow-surge + a chime. (Skips off-route rails — those have a
+// jewel at the apex already.) Rings sit at the rail's level/height; collected by proximity.
+function seedRailRings(room, rng) {
+  room.rings = [];
+  let id = 0;
+  for (const r of room.skyRails || []) {
+    if (r.route || room.rings.length > 150) continue;
+    const dx = r.x2 - r.x1, dy = r.y2 - r.y1, len = Math.hypot(dx, dy) || 1;
+    const n = clamp(Math.round(len / 175), 4, 9);
+    const cnx = -dy / len, cny = dx / len, k = r.twists || 1;
+    for (let i = 1; i < n; i++) {
+      const u = i / n;
+      const off = r.bow ? r.bow * Math.sin(u * Math.PI * k) : 0;
+      room.rings.push({ id: id++, x: r.x1 + dx * u + cnx * off, y: r.y1 + dy * u + cny * off, level: r.level || 1, rise: r.rise || 1, taken: false, phase: rng() * TAU });
+    }
+  }
 }
 
 function seedSkyRails(room, rng) {

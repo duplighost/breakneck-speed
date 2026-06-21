@@ -19,7 +19,7 @@ import { updateBullets } from './systems/bullets.js';
 import { updateHazards } from './systems/hazards.js';
 import { updatePickups } from './systems/pickups.js';
 import { tickDirector } from './systems/director.js';
-import { tickCombo, tickRedline } from './systems/score.js';
+import { tickCombo, tickRedline, tickRings } from './systems/score.js';
 import { startRun, updateRound, updateTransition, beginRound } from './systems/rooms.js';
 import { ensure as ensureAudio, toggleSfx, sfx } from './audio/sfx.js';
 import { rollRoom, reachableFrom } from './systems/roomRoller.js';
@@ -130,6 +130,7 @@ export function step(raw) {
       const move = getMove(), aim = getAim();
       const p = state.run.player;
       updatePlayer(p, move, aim, room, dt);
+      tickRings(room, p);
       updateBehavior(room, p, move, aim, raw);
       updateSpawnQueue(room, dt);
       tickDirector(room, dt);

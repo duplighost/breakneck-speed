@@ -1,10 +1,10 @@
 // Combo, streaks, bonuses, bests.
-import { COMBO, SCORE, STREAK_NAMES } from '../config.js';
+import { COMBO, SCORE, STREAK_NAMES, TIER_LIFT } from '../config.js';
 import { state, saveNow } from '../state.js';
 import { addFloat, burst, ripple } from '../render/particles.js';
 import { addFlash, addShake } from './juice.js';
 import { sfx } from '../audio/sfx.js';
-import { damp } from '../rng.js';
+import { damp, dist } from '../rng.js';
 
 // Crossing an integer combo tier (×2, ×3 …) fires escalating juice — the climb feels huge.
 function comboMilestone(tier, e) {
@@ -103,6 +103,32 @@ export function tickRedline(raw) {
   }
 }
 export const redlineActive = () => (state.run?.redlineT || 0) > 0;
+
+// ── Rail rings: Sonic-style collectibles strung along the sky rails. Scooped up by
+// proximity (same level) while grinding — score + a flow-surge tick + a chime, with a
+// RING ×N chain for sweeping a line in one pass. ──
+export function tickRings(room, p) {
+  const rings = room.rings;
+  if (!rings || !rings.length || !p) return;
+  const lv = p.level || 0;
+  for (const ring of rings) {
+    if (ring.taken || (ring.level || 0) !== lv) continue;
+    if (dist(p.x, p.y, ring.x, ring.y) < p.r + 28) { ring.taken = true; collectRing(room, p, ring); }
+  }
+}
+function collectRing(room, p, ring) {
+  const run = state.run; if (!run) return;
+  const fy = ring.y - TIER_LIFT * (ring.rise || 1) * (ring.level || 0); // pop at the ring's drawn height
+  const now = room.time || 0;
+  run._ringChain = (now - (run._ringAt ?? -99) < 0.85) ? (run._ringChain || 0) + 1 : 1;
+  run._ringAt = now;
+  run.score += Math.floor(45 * (run.combo || 1) * (1 + Math.min(2, run._ringChain * 0.08)));
+  addRedline(0.02);
+  burst(room, ring.x, fy, '#ffce5a', 7, 150, 0.26, 2.4);
+  burst(room, ring.x, fy, '#ffffff', 3, 90, 0.2, 2);
+  sfx('pickup');
+  if (run._ringChain >= 5 && run._ringChain % 5 === 0) addFloat(room, ring.x, fy - 20, `RING ×${run._ringChain}`, '#ffce5a', true, 0.62);
+}
 
 export function killScore(e) {
   const run = state.run;
