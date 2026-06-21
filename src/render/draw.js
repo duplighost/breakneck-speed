@@ -198,6 +198,7 @@ export function drawFrame() {
   if (room.weather === 'rain') drawRain(room, pal); // neon rain + lightning
   else if (room.weather === 'fog') drawFog(room, pal); // drifting mist banks
   else if (room.weather === 'snow') drawSnow(room, pal); // slow neon flurry
+  else drawAurora(room, pal); // clear night: a shimmering aurora over the skyline
   if (state.mode === 'play') drawSpeedStreaks(p); // anime speed-lines at dash/flow velocity
   if (p && state.mode === 'play') drawDangerTriangles(room, p);
   if (room.portal) drawPortalArrow(room);
@@ -1297,6 +1298,34 @@ function drawRain(room, pal) {
       const y0 = ((hsh(i * 7.7) * (H + L.len) + tt * L.spd)) % (H + L.len) - L.len;
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 - L.slant * L.len, y0 + L.len); ctx.stroke();
     }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+// Clear-night aurora: wavy ribbons of green/violet/cyan light shimmering over the top of
+// the sky, fading down. A quiet payoff for the rooms that don't roll weather.
+function drawAurora(room, pal) {
+  if (reduced() || state.lowFx) return;
+  const tt = performance.now() / 1000, W = view.W, H = view.H;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const cols = ['#3affc0', '#8a6cff', '#3ad0ff'];
+  for (let b = 0; b < 3; b++) {
+    const baseY = H * 0.05 + b * 26, depth = 90 + b * 24;
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.lineTo(0, baseY);
+    for (let x = 0; x <= W; x += 26) {
+      const y = baseY + Math.sin(x * 0.004 + tt * 0.5 + b * 1.7) * 24 + Math.sin(x * 0.012 - tt * 0.35 + b) * 12;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, 0); ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, 0, baseY + depth);
+    g.addColorStop(0, hexA(cols[b], 0.0));
+    g.addColorStop(0.65, hexA(cols[b], 0.11));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.globalAlpha = 0.5 + 0.32 * Math.sin(tt * 0.45 + b * 1.3);
+    ctx.fill();
   }
   ctx.restore();
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';

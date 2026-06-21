@@ -355,6 +355,20 @@ function updateMinibossPattern(e, room, p, to, d, dt) {
       for (let k = 0; k < (enraged ? 4 : 3); k++) fireEnemyBurst(room, e, p.x, p.y, 1, 0, 360, 3.0, e.color);
       fireEnemyRing(room, e, enraged ? 12 : 8, 200, 3.2, e.color, e.phase * 0.5);
       break;
+    case 'spiral': // rotating spiral of rings — successive rings offset by an advancing angle
+      e.patternCd = enraged ? 1.1 : 1.7;
+      e.spiralA = (e.spiralA || 0) + 0.7;
+      fireEnemyRing(room, e, enraged ? 10 : 7, 220 + idx * 8, 3.4, e.color, e.spiralA);
+      break;
+    case 'summon': // calls in escorts + a covering burst
+      e.patternCd = enraged ? 2.6 : 3.6;
+      for (let k = 0; k < (enraged ? 3 : 2); k++) {
+        const a = Math.random() * TAU, sx = clamp(e.x + Math.cos(a) * 130, room.wall + 40, room.w - room.wall - 40), sy = clamp(e.y + Math.sin(a) * 130, room.wall + 40, room.h - room.wall - 40);
+        spawnTelegraphed(room, k % 2 ? 'gunner' : 'skitter', sx, sy, 0.6);
+      }
+      fireEnemyBurst(room, e, p.x, p.y, 2, 0.4, 300, 3.0, e.color);
+      addFloat(room, e.x, e.y - e.r - 20, '❖', e.color, false, 0.5); sfx('telegraph');
+      break;
     default: // chargeBurst
       e.patternCd = enraged ? 1.7 : 2.5; e.vx += to.x * 660; e.vy += to.y * 660;
       fireEnemyBurst(room, e, p.x, p.y, enraged ? 6 : 4, 0.7, 300, 3.2, e.color);

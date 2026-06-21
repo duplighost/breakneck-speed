@@ -45,6 +45,8 @@ export const MINIBOSSES = [
   { id: 'cantor',  title: 'High Antiphon',  host: 'hexer',    hp: 2.8, r: 1.58, speed: 1.06, color: '#9fffe0', pattern: 'orbitRing' },
   { id: 'breaker', title: 'Gate-Breaker',   host: 'charger',  hp: 3.0, r: 1.62, speed: 1.30, color: '#ff5c91', pattern: 'chargeBurst' },
   { id: 'warden',  title: 'Sub-Warden',     host: 'turret',   hp: 3.2, r: 1.6,  speed: 1.0,  color: '#c494ff', pattern: 'crossfire' },
+  { id: 'choir',   title: 'Choir-Mother',   host: 'gunner',   hp: 2.6, r: 1.5,  speed: 1.0,  color: '#c8ffdf', pattern: 'summon' },
+  { id: 'saint',   title: 'Spiral-Saint',   host: 'turret',   hp: 2.9, r: 1.55, speed: 1.04, color: '#ff9bf5', pattern: 'spiral' },
 ];
 
 export const BESTIARY = {
