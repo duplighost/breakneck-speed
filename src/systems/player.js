@@ -526,6 +526,26 @@ function onGrindLatch(p, room) {
   return true;
 }
 
+// PERFECT DISMOUNT: kicking off a rail at the skill moment — near the end of a sky
+// rail (the signature jewel-traversal) or off an edge rail at boosted speed — pops a
+// bright bonus: score scaled by combo + grind chain, a flow-surge kick, a launch
+// boost, and slow-mo. Rewards riding the line to its tip before ejecting at speed.
+function perfectGrindBonus(p, room) {
+  const run = state.run; if (!run) return false;
+  const n = run._grindChain || 1;
+  const pts = Math.floor(140 * (run.combo || 1) * (1 + n * 0.15));
+  run.score += pts;
+  addRedline(0.16);
+  p.flowT = Math.max(p.flowT || 0, 0.55);
+  addFloat(room, p.x, p.y - 66, 'PERFECT!', '#7df9ff', true, 1.05);
+  ripple(room, p.x, p.y, '#7df9ff', 158, 0.5); ripple(room, p.x, p.y, '#ffffff', 96, 0.36);
+  burst(room, p.x, p.y, '#ffffff', 18, 340, 0.34, 3.8);
+  addFlash(0.18); addShake(0.34);
+  slowMo(0.05);
+  sfx('perfect');
+  return true;
+}
+
 function maybeLatchRail(p, room, x0 = p.x, y0 = p.y, startLevel = p.level || 0) {
   if (p.rail?.active || p.air || (p._railLatchCd || 0) > 0) return false;
   if (tryLatchEscapeRail(p, room, x0, y0)) return onGrindLatch(p, room); // victory-lap express wins priority
@@ -953,6 +973,7 @@ export function tryDash(dx = null, dy = null, move = null) {
   const n = norm(dx, dy);
   if (n.m < 0.08) return;
   p._dashKills = 0; // fresh dash → reset the multi-cut "SLICE ×N" counter
+  let perfectLaunch = false; // set when a rail is ejected at the skill moment (below)
 
   // Rails: dash along the rail to rocket; dash away to cut off into a normal dash.
   if (p.rail?.active) {
@@ -978,6 +999,7 @@ export function tryDash(dx = null, dy = null, move = null) {
         slowMo(0.035);
         return;
       }
+      if ((p.rail.u || 0) >= 0.7) perfectLaunch = perfectGrindBonus(p, room); // ejected near the rail's end
       p.rail = null; p._railLatchCd = Math.max(p._railLatchCd || 0, 0.20);
     } else {
       const info = railPoint(room, p, p.rail.s || pointToRailS(room, p, p.x, p.y));
@@ -1001,6 +1023,7 @@ export function tryDash(dx = null, dy = null, move = null) {
         slowMo(0.035);
         return;
       }
+      if ((p.rail.rocketT || 0) > 0) perfectLaunch = perfectGrindBonus(p, room); // ejected at boosted speed
       p.rail = null; p._railLatchCd = Math.max(p._railLatchCd || 0, 0.20);
     }
   }
@@ -1009,7 +1032,8 @@ export function tryDash(dx = null, dy = null, move = null) {
   // it (capped — an assist, not auto-aim). Makes dash-into-enemy connect satisfyingly.
   const hd = homingDashDir(p, room, n.x, n.y);
   p.lastDashAngle = Math.atan2(hd.y, hd.x);
-  p.vx = hd.x * PLAYER.DASH_IMPULSE; p.vy = hd.y * PLAYER.DASH_IMPULSE;
+  const launch = PLAYER.DASH_IMPULSE * (perfectLaunch ? 1.2 : 1); // PERFECT dismount flings you faster
+  p.vx = hd.x * launch; p.vy = hd.y * launch;
   p.dashT = p.dashDur;
   p._dashStartLevel = p.level || 0;
   p._dashHitIds = new Set(); p._dashCutPrimed = false; // fresh per-dash hit-set + prime gate
