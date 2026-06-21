@@ -62,9 +62,11 @@ export function setMenu(menu) { menuRef = menu; }
 
 export function showTitle(menu = menuRef) {
   const s = state.save;
+  const sRanks = s.lifetime?.sRanks || 0;
   const meta = (s.bestScore
     ? `best ${Math.floor(s.bestScore).toLocaleString()} · round ${s.bestRound} · ${s.runs} runs`
     : 'lace up. the city is the level.')
+    + (sRanks ? `  ·  ★ ${sRanks.toLocaleString()} S-ranks` : '')
     + `  ·  ✦ ${(s.sparks || 0).toLocaleString()} sparks`;
   const buttons = [
     ['▶  Play', () => menu.start()],

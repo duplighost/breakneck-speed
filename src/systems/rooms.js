@@ -129,6 +129,20 @@ export function clearRoom(room) {
     sfx('perfect');
     if (grade === 'S') { addFlash(0.32); state.run.sRanks = (state.run.sRanks || 0) + 1; state.save.lifetime.sRanks = (state.save.lifetime.sRanks || 0) + 1; }
   }
+  // RANK STREAK — consecutive A+ clears chain into an escalating bonus. Drop below A
+  // and it resets. A run-long "don't break it" hook layered on the per-room grade.
+  if (grade === 'S' || grade === 'A') {
+    state.run.rankStreak = (state.run.rankStreak || 0) + 1;
+    const n = state.run.rankStreak;
+    if (n >= 2) {
+      const bonus = 150 * n * Math.max(1, Math.floor(state.run.combo));
+      state.run.score += bonus;
+      addFloat(room, p.x, p.y - 168, `RANK STREAK ×${n}  +${bonus.toLocaleString()}`, '#ffd36e', true, 1.0 + Math.min(0.5, n * 0.05));
+      if (n % 5 === 0) { dropPickup(room, 'heart', p.x, p.y + 70); addFloat(room, p.x, p.y + 50, 'STREAK REWARD ♥', '#ff8ea6', true, 0.8); }
+    }
+  } else {
+    state.run.rankStreak = 0;
+  }
   for (let i = 0; i < 50; i++) {
     const a = (i / 50) * Math.PI * 2, rr = 40 + Math.random() * 170;
     burst(room, room.portal.x, room.portal.y, room.biome.pal.accent3, 1, rr * 1.7, 0.85, 3);
