@@ -369,6 +369,28 @@ function updateMinibossPattern(e, room, p, to, d, dt) {
       fireEnemyBurst(room, e, p.x, p.y, 2, 0.4, 300, 3.0, e.color);
       addFloat(room, e.x, e.y - e.r - 20, '❖', e.color, false, 0.5); sfx('telegraph');
       break;
+    case 'ringGap': { // a full ring with a safe gap punched toward you — read it, dash the gap
+      e.patternCd = enraged ? 1.7 : 2.5;
+      const n = enraged ? 28 : 22, toA = Math.atan2(p.y - e.y, p.x - e.x), gap = enraged ? 0.5 : 0.72;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        const da = Math.abs(((a - toA + Math.PI) % TAU + TAU) % TAU - Math.PI); // angular gap to your heading
+        if (da < gap) continue;
+        fireEnemyShot(room, e, Math.cos(a), Math.sin(a), 206 + idx * 8, 5.0, 3.7, e.color);
+      }
+      ripple(room, e.x, e.y, e.color, 124, 0.4); sfx('telegraph');
+      break;
+    }
+    case 'sweep': { // a dense fan that walks around the arena like a searchlight — keep moving
+      e.patternCd = enraged ? 0.5 : 0.82;
+      e.sweepA = (e.sweepA ?? Math.random() * TAU) + (enraged ? 0.52 : 0.4);
+      for (let k = -2; k <= 2; k++) {
+        const a = e.sweepA + k * 0.12;
+        fireEnemyShot(room, e, Math.cos(a), Math.sin(a), 252 + idx * 8, 5.0, 3.5, e.color);
+      }
+      if (enraged) sfx('telegraph');
+      break;
+    }
     default: // chargeBurst
       e.patternCd = enraged ? 1.7 : 2.5; e.vx += to.x * 660; e.vy += to.y * 660;
       fireEnemyBurst(room, e, p.x, p.y, enraged ? 6 : 4, 0.7, 300, 3.2, e.color);

@@ -47,6 +47,8 @@ export const MINIBOSSES = [
   { id: 'warden',  title: 'Sub-Warden',     host: 'turret',   hp: 3.2, r: 1.6,  speed: 1.0,  color: '#c494ff', pattern: 'crossfire' },
   { id: 'choir',   title: 'Choir-Mother',   host: 'gunner',   hp: 2.6, r: 1.5,  speed: 1.0,  color: '#c8ffdf', pattern: 'summon' },
   { id: 'saint',   title: 'Spiral-Saint',   host: 'turret',   hp: 2.9, r: 1.55, speed: 1.04, color: '#ff9bf5', pattern: 'spiral' },
+  { id: 'aperture', title: 'The Aperture',  host: 'hexer',    hp: 3.0, r: 1.6,  speed: 1.08, color: '#7df9ff', pattern: 'ringGap' },
+  { id: 'lighthouse', title: 'Lighthouse',  host: 'turret',   hp: 3.1, r: 1.62, speed: 1.0,  color: '#ffe26a', pattern: 'sweep' },
 ];
 
 export const BESTIARY = {
