@@ -84,7 +84,7 @@ export function rollRoom(run, round) {
     floorplanId: 'none', openings: [], sanctum: null, tiers: [], vents: [], setpieces: [],
     surfaces: [], escapeRail: null,
     districts: [], flowLanes: [], skyRails: [], skyways: [], offRoutes: [], signs: [], traffic: [], waypoints: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
-    weather: chance(rng, 0.42) ? 'rain' : 'clear',  // some districts are rain-slicked (drawRain)
+    weather: pick(rng, ['rain', 'rain', 'fog', 'snow', 'clear', 'clear']), // drawn in draw.js (rain/fog/snow)
     // XL city-scale sprawl — bigger than either fork. Density (cover, rooftops, rails,
     // surfaces, landmarks, enemy budget) all scale with area below so it stays packed.
     // Bigger arenas (~25% up): more room to grind, build, and hide secrets in.

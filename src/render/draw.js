@@ -195,10 +195,13 @@ export function drawFrame() {
     ctx.restore();
   }
   drawEclipse(room); // False Moon's eclipse darkens the field around the moon
-  if (room.weather === 'rain') drawRain(room, pal); // neon rain + lightning over rain-slicked districts
+  if (room.weather === 'rain') drawRain(room, pal); // neon rain + lightning
+  else if (room.weather === 'fog') drawFog(room, pal); // drifting mist banks
+  else if (room.weather === 'snow') drawSnow(room, pal); // slow neon flurry
   if (state.mode === 'play') drawSpeedStreaks(p); // anime speed-lines at dash/flow velocity
   if (p && state.mode === 'play') drawDangerTriangles(room, p);
   if (room.portal) drawPortalArrow(room);
+  if (state.mode === 'play') drawMinimap(room, pal, p); // corner radar of the whole sprawl
   drawBossBar(room);
   drawBossIntro(room);
   if (state.mode === 'play') { drawPad(moveTouch, '#7dfdff'); drawPad(aimTouch, '#ffd36e'); }
@@ -238,6 +241,53 @@ function drawTiers(room, pal) {
     if (t.x + t.w < vis.l || t.x > vis.r || t.y + t.h < vis.t || t.y - roofLift(t) > vis.b) continue;
     drawBuilding(room, pal, t);
   }
+}
+
+// Corner radar: a scaled-down map of the whole sprawl with the district layout, the player
+// (heading arrow), the exit portal, mini-bosses, off-route entrances, shops and gems. Makes
+// the gigantic city navigable at a glance.
+function drawMinimap(room, pal, p) {
+  if (state.lowFx || !room || !room.w) return;
+  const pad = 12, mw = view.mobile ? 104 : 158, mh = mw * (room.h / room.w);
+  const x0 = view.W - mw - pad, y0 = view.mobile ? 58 : 62;
+  const sx = mw / room.w, sy = mh / room.h;
+  const MX = (wx) => x0 + wx * sx, MY = (wy) => y0 + wy * sy;
+  ctx.save();
+  ctx.globalAlpha = 0.55; ctx.fillStyle = 'rgba(5,8,16,0.66)';
+  roundRectPath(ctx, x0 - 5, y0 - 5, mw + 10, mh + 10, 8); ctx.fill();
+  ctx.globalAlpha = 0.6; ctx.strokeStyle = hexA(pal.accent3, 0.6); ctx.lineWidth = 1.4;
+  roundRectPath(ctx, x0 - 5, y0 - 5, mw + 10, mh + 10, 8); ctx.stroke();
+  ctx.save(); roundRectPath(ctx, x0, y0, mw, mh, 4); ctx.clip();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const d of room.districts || []) { ctx.globalAlpha = 0.16; ctx.fillStyle = d.color || pal.accent3; ctx.fillRect(MX(d.x), MY(d.y), d.w * sx, d.h * sy); }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  const dot = (wx, wy, col, r = 2.4) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(MX(wx), MY(wy), r, 0, TAU); ctx.fill(); };
+  ctx.globalAlpha = 0.95;
+  for (const wp of room.waypoints || []) {
+    if (wp.kind === 'shop') dot(wp.x, wp.y, '#ffd36e', 2.4);
+    else if (wp.kind === 'gem' || wp.kind === 'skyCache' || wp.kind === 'mysteryVault') dot(wp.x, wp.y, '#ffffff', 2.2);
+  }
+  for (const r of room.offRoutes || []) {
+    const e = r.launch; if (!e) continue;
+    ctx.fillStyle = r.kind === 'under' ? '#ffd9a6' : '#9fe8ff';
+    const ex = MX(e.x), ey = MY(e.y); ctx.beginPath();
+    if (r.kind === 'under') { ctx.moveTo(ex - 3, ey - 3); ctx.lineTo(ex + 3, ey - 3); ctx.lineTo(ex, ey + 3); }
+    else { ctx.moveTo(ex - 3, ey + 3); ctx.lineTo(ex + 3, ey + 3); ctx.lineTo(ex, ey - 3); }
+    ctx.closePath(); ctx.fill();
+  }
+  for (const en of room.enemies) if (en.miniboss && en.hp > 0) dot(en.x, en.y, '#ff5d6c', 3);
+  if (room.portal) {
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin((room.time || 0) * 4);
+    ctx.strokeStyle = pal.accent2; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(MX(room.portal.x), MY(room.portal.y), 4.5, 0, TAU); ctx.stroke();
+  }
+  if (p) {
+    ctx.globalAlpha = 1; ctx.save(); ctx.translate(MX(p.x), MY(p.y)); ctx.rotate(p.face || 0);
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(-3.5, -3); ctx.lineTo(-3.5, 3); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 // Floating neighborhood-name holograms: each city block announces itself with a glitchy
@@ -1246,6 +1296,43 @@ function drawRain(room, pal) {
       const x0 = ((hsh(i * 3.1) * (W + 240) + tt * 70 * L.slant)) % (W + 240) - 120;
       const y0 = ((hsh(i * 7.7) * (H + L.len) + tt * L.spd)) % (H + L.len) - L.len;
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 - L.slant * L.len, y0 + L.len); ctx.stroke();
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+// Drifting fog banks: a soft base haze + slow translucent blobs crossing the view.
+function drawFog(room, pal) {
+  if (reduced() || state.lowFx) return;
+  const tt = performance.now() / 1000, W = view.W, H = view.H;
+  ctx.save();
+  ctx.globalAlpha = 0.05; ctx.fillStyle = '#8aa0c8'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 6; i++) {
+    const bw = 360 + hsh(i * 2.2) * 320;
+    let x = (hsh(i * 3.1) * (W + bw) + tt * (14 + hsh(i) * 22)) % (W + bw); x -= bw / 2;
+    const y = H * 0.25 + hsh(i * 5.1) * H * 0.6 + Math.sin(tt * 0.2 + i) * 22;
+    const g = ctx.createRadialGradient(x, y, 10, x, y, bw * 0.6);
+    g.addColorStop(0, 'rgba(184,202,232,0.10)'); g.addColorStop(1, 'rgba(184,202,232,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, bw * 0.6, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+// Slow neon flurry: two parallax layers of drifting flakes catching the city light.
+function drawSnow(room, pal) {
+  if (reduced() || state.lowFx) return;
+  const tt = performance.now() / 1000, W = view.W, H = view.H;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const L of [{ n: 90, spd: 85, sz: 1.4, a: 0.3, sway: 16 }, { n: 50, spd: 145, sz: 2.5, a: 0.42, sway: 30 }]) {
+    for (let i = 0; i < L.n; i++) {
+      let x = (hsh(i * 3.1) * W + Math.sin(tt * 0.5 + i) * L.sway) % W; if (x < 0) x += W;
+      const y = (hsh(i * 7.7) * (H + 12) + tt * L.spd) % (H + 12);
+      ctx.globalAlpha = L.a * (0.6 + 0.4 * Math.sin(tt * 2 + i));
+      ctx.fillStyle = i % 5 === 0 ? pal.accent2 : '#eaf2ff';
+      ctx.beginPath(); ctx.arc(x, y, L.sz, 0, TAU); ctx.fill();
     }
   }
   ctx.restore();
