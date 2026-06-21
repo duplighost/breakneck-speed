@@ -1,2 +1,5 @@
 _extracted/
 *.log
+dist/
+breakneck-speed.zip
+*.zip
