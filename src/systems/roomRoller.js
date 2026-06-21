@@ -900,10 +900,11 @@ function ventClear(room, x, y, pad) {
 function seedRailRings(room, rng) {
   room.rings = [];
   let id = 0;
+  const rush = room.mutator?.ringBonus ? 1.8 : 1; // RING RUSH packs the rails
   for (const r of room.skyRails || []) {
-    if (r.route || room.rings.length > 150) continue;
+    if (r.route || room.rings.length > 220) continue;
     const dx = r.x2 - r.x1, dy = r.y2 - r.y1, len = Math.hypot(dx, dy) || 1;
-    const n = clamp(Math.round(len / 175), 4, 9);
+    const n = clamp(Math.round((len / 175) * rush), 4, 14);
     const cnx = -dy / len, cny = dx / len, k = r.twists || 1;
     for (let i = 1; i < n; i++) {
       const u = i / n;

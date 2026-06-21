@@ -62,6 +62,10 @@ export const MUTATOR_LINES = {
   bellFed: 'Someone fed the captains.',
   lowCeiling: 'The room pulls its walls in like a held breath.',
   doubles: 'The room deals the same hand twice and dares you.',
+  goldRush: 'The whole block is paved in payout. Spend nothing. Take everything.',
+  eliteStorm: 'The big ones travel in weather. Mind the thunder.',
+  ringRush: 'The rails are strung with light. Go pull it down.',
+  redlineCity: 'This grid runs hot. Don\'t you dare coast.',
 };
 
 export const EVENT_WHISPERS = {

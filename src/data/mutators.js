@@ -10,6 +10,10 @@ export const MUTATORS = [
   { id: 'bellFed',        name: 'BELL-FED',            forceCaptains: 2 },
   { id: 'lowCeiling',     name: 'LOW CEILING',         sizeScale: 0.85 },
   { id: 'doubles',        name: 'DOUBLES',             doubleRecipe: true },
+  { id: 'goldRush',       name: 'GOLD RUSH',           scoreMult: 1.45, sparkBonus: 3 },
+  { id: 'eliteStorm',     name: 'ELITE STORM',         eliteBonus: 0.5 },
+  { id: 'ringRush',       name: 'RING RUSH',           ringBonus: true },
+  { id: 'redlineCity',    name: 'REDLINE CITY',        redlineFast: true },
 ];
 
 export const mutatorById = (id) => MUTATORS.find(m => m.id === id);

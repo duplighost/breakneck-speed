@@ -78,6 +78,7 @@ export const REDLINE = { DUR: 5, SPEED: 1.26, SCORE: 1.6 };
 export function addRedline(amount) {
   const run = state.run;
   if (!run || run.redlineT > 0) return; // can't refill mid-surge
+  if (state.room?.mutator?.redlineFast) amount *= 1.6; // REDLINE CITY: the meter runs hot
   run.redline = Math.min(1, (run.redline || 0) + amount);
   if (run.redline >= 1) igniteRedline();
 }
@@ -122,7 +123,7 @@ function collectRing(room, p, ring) {
   const now = room.time || 0;
   run._ringChain = (now - (run._ringAt ?? -99) < 0.85) ? (run._ringChain || 0) + 1 : 1;
   run._ringAt = now;
-  run.score += Math.floor(45 * (run.combo || 1) * (1 + Math.min(2, run._ringChain * 0.08)));
+  run.score += Math.floor(45 * (run.combo || 1) * (1 + Math.min(2, run._ringChain * 0.08)) * (state.room?.mutator?.ringBonus ? 2 : 1));
   addRedline(0.02);
   burst(room, ring.x, fy, '#ffce5a', 7, 150, 0.26, 2.4);
   burst(room, ring.x, fy, '#ffffff', 3, 90, 0.2, 2);

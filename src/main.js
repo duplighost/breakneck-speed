@@ -248,6 +248,7 @@ function installDebug(actions) {
         const reach = reachableFrom(r, r.w / 2, r.h * 0.66);
         out.push({
           round: i, biome: r.biome.id, layout: r.layoutId, recipe: r.recipeId,
+          mutatorId: r.mutatorId || null, rings: r.rings?.length || 0,
           stage: r.stage, obstacles: r.obstacles.length,
           hazards: r.hazards.length + r.lanes.length,
           breakables: r.obstacles.filter(o => o.breakable).length,
