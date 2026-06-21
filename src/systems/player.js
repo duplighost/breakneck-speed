@@ -787,7 +787,7 @@ function updateSkyRailRide(p, room, move, dt) {
   p.x = info.x; p.y = info.y;
   p.vx = info.tx * (p.rail.dir || 1) * p.rail.speed;
   p.vy = info.ty * (p.rail.dir || 1) * p.rail.speed;
-  p.level = r.level || 1; p.stillT = 0; p.flowT = Math.max(p.flowT || 0, 0.20);
+  p.level = r.level ?? 1; p.stillT = 0; p.flowT = Math.max(p.flowT || 0, 0.20); // ?? keeps underground (level 0) hittable
   if (p.rail.rocketT > 0) {
     if (!(p._dashHitIds instanceof Set)) p._dashHitIds = new Set();
     performDashCut(p, room, PLAYER.DASH_SWEEP_RANGE * 1.45);

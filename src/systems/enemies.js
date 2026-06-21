@@ -215,7 +215,9 @@ export function updateEnemies(room, dt) {
     }
     e.x += e.vx * dt; e.y += e.vy * dt;
     if (e.offRoute) {
-      e.level = e.offRoute.kind === 'under' ? 0 : 1; // off-map sentinels hold the rail (no bounds clamp / no floor relevel)
+      e.level = e.offRoute.kind === 'under' ? 0 : 1; // off-map sentinels hold the rail at its level
+      if (e.anchorX != null) { e.x = e.anchorX; e.y = e.anchorY; } // pinned: they fire but never drift into play
+      e.vx = 0; e.vy = 0;
     } else {
       const w = room.wall - 22;
       e.x = clamp(e.x, w + e.r, room.w - w - e.r);

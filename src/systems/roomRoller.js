@@ -1431,6 +1431,7 @@ function buildOffRoute(room, rng, opts) {
     const u = 0.34 + (n > 1 ? (i / (n - 1)) * 0.54 : 0);
     const e = makeEnemy('turret', ex0 + (ex - ex0) * u, ey0 + (ey - ey0) * u, room);
     e.level = level; e.offRoute = route; e.routeU = u;
+    e.anchorX = e.x; e.anchorY = e.y;   // pinned to the rail so they never drift into play
     e.hp *= 0.7; e.maxHp = e.hp;
     room.enemies.push(e);
   }
