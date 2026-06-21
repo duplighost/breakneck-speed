@@ -66,6 +66,8 @@ export function sfx(kind) {
     case 'thunder': noise(0.5, 0.08); note(55, 0.5, 'sawtooth', 0.05); note(40, 0.7, 'sine', 0.04, 0.08); break;
     // PERFECT dismount — a bright crystalline ping, a half-step above the grind chime
     case 'perfect': note(988, 0.05, 'sine', 0.04); note(1319, 0.07, 'sine', 0.035, 0.03); note(1976, 0.12, 'triangle', 0.03, 0.07); break;
+    // backflip trick — a quick airy whoosh into a bright landing chime
+    case 'trick': noise(0.12, 0.035); note(523, 0.05, 'triangle', 0.03); note(784, 0.07, 'triangle', 0.03, 0.05); note(1047, 0.1, 'sine', 0.028, 0.1); break;
   }
 }
 

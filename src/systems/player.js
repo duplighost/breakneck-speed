@@ -86,7 +86,9 @@ export function updatePlayer(p, move, aim, room, dt) {
   if (p.rail?.active && (p.rail.rocketT || 0) > 0) p.grindSpinV = Math.max(p.grindSpinV || 0, 11 * (p.rail.dir || 1));
   p.grindSpin = (p.grindSpin || 0) + (p.grindSpinV || 0) * dt;
   p.grindSpinV = damp(p.grindSpinV || 0, 0, 3.0, dt);
-  if (!p.rail?.active) p.grindSpin = damp(p.grindSpin || 0, 0, 9, dt);
+  // grinding keeps the spin; airborne (vent dash-hop) keeps it too so the backflip
+  // plays through the arc — otherwise it unwinds to upright the moment you're free.
+  if (!p.rail?.active && !p.air) p.grindSpin = damp(p.grindSpin || 0, 0, 9, dt);
 
   // aim + auto-fire: the gun never stops. Manual aim wins; with no manual aim, lock
   // onto the nearest enemy so you keep shooting without aiming (constant flow state).
@@ -412,8 +414,24 @@ function updateAirborne(p, room, dt) {
     p.vy = dir.y * (a.dash ? 1420 : 820);
     ripple(room, p.x, p.y, room.biome.pal.accent2, a.dash ? 132 : 92, 0.42);
     burst(room, p.x, p.y, room.biome.pal.accent3, a.dash ? 20 : 12, a.dash ? 240 : 160, 0.35, 3);
+    if (a.dash) airTrick(p, room, a); // a dash-hop backflip lands a STYLE bonus
   }
   return true;
+}
+
+// STYLE: a dash-vent hop lands a named backflip trick — a long arc upgrades it to a
+// DOUBLE. Style score scales with combo, plus a flow-surge tick and a flashy callout.
+function airTrick(p, room, a) {
+  const run = state.run; if (!run) return;
+  const far = dist(a.sx, a.sy, a.ex, a.ey) > 720;
+  const name = far ? 'DOUBLE BACKFLIP!' : 'BACKFLIP!';
+  run.score += Math.floor(95 * (run.combo || 1) * (far ? 2 : 1));
+  addRedline(far ? 0.08 : 0.05);
+  addFloat(room, p.x, p.y - 60, name, '#ffd36e', true, far ? 1.0 : 0.82);
+  ripple(room, p.x, p.y, '#ffd36e', far ? 140 : 110, 0.42);
+  burst(room, p.x, p.y, '#ffffff', far ? 16 : 10, far ? 300 : 220, 0.3, 3.4);
+  addShake(far ? 0.3 : 0.2);
+  sfx('trick');
 }
 
 function maybeVentLaunch(p, room, x0, y0, fromDash) {
@@ -444,7 +462,7 @@ function launchVent(p, room, v, dash) {
   p._ventExitX = v.toX; p._ventExitY = v.toY; p._ventExitLevel = v.toLevel ?? 1;
   p.ventT = dash ? 0.46 : 0.34;
   p.inv = Math.max(p.inv, dash ? 0.42 : 0.22);
-  if (dash) { p.dashT = 0; p.dashCd = 0; }
+  if (dash) { p.dashT = 0; p.dashCd = 0; p.grindSpinV = 40 * (Math.sign(v.toX - p.x) || 1); } // dash-hop = a flashy backflip
   v.flash = 0.38;
   addFloat(room, v.x, v.y - 34, dash ? '↟↟' : '↟', room.biome.pal.accent2, true, dash ? 0.58 : 0.42);
   ripple(room, v.x, v.y, room.biome.pal.accent2, dash ? 126 : 86, 0.35);
