@@ -1460,6 +1460,7 @@ function drawSkyLife(room, pal, p) {
     ctx.beginPath(); ctx.ellipse(x, yLane, 10, 3, 0, 0, TAU); ctx.fill();
     ctx.globalCompositeOperation = 'lighter';
   }
+  drawAirship(room, pal, vis, t); // a slow advertising blimp — a city landmark
   // searchlights from the two tallest towers
   const tall = (room.tiers || []).slice().sort((a, b) => (b.rise || 1) - (a.rise || 1)).slice(0, 2);
   for (let k = 0; k < tall.length; k++) {
@@ -1478,6 +1479,48 @@ function drawSkyLife(room, pal, p) {
     ctx.globalAlpha = 0.7; ctx.fillStyle = '#ffffff';
     ctx.beginPath(); ctx.arc(ox, oy, 3, 0, TAU); ctx.fill();
   }
+  ctx.restore();
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+// A slow advertising airship cruising the high sky: a dark capsule with a neon rim,
+// a glowing scrolling marquee on its flank, blinking belly lights, a tail fin and a
+// soft ground shadow. One per room, seeded — a working-metropolis landmark.
+function drawAirship(room, pal, vis, t) {
+  const idx = room.idx || 0;
+  const speed = 24, range = room.w + 1400;
+  let ax = (hsh(idx * 4.2 + 1.3) * range + t * speed); ax = ((ax % range) + range) % range - 700;
+  const lane = room.wall + 180 + hsh(idx * 9.1) * 160;
+  const ay = lane - (560 + hsh(idx * 6.6) * 240);
+  if (ax < vis.l - 380 || ax > vis.r + 380 || ay < vis.t - 380 || ay > vis.b + 380) return;
+  const hue = Math.floor(hsh(idx * 3.7 + 0.5) * 360), col = `hsl(${hue},90%,64%)`;
+  const bw = 132, bh = 40;
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 0.05; ctx.fillStyle = '#000';                 // ground shadow far below
+  ctx.beginPath(); ctx.ellipse(ax, lane, bw * 0.7, 7, 0, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 0.92; ctx.fillStyle = '#0a0d1b';              // hull
+  ctx.beginPath(); ctx.ellipse(ax, ay, bw, bh, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#0a0d1b';                                      // tail fin
+  ctx.beginPath(); ctx.moveTo(ax - bw * 0.9, ay); ctx.lineTo(ax - bw * 1.18, ay - bh * 0.9); ctx.lineTo(ax - bw * 1.18, ay + bh * 0.9); ctx.closePath(); ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.strokeStyle = col; // neon rim
+  ctx.shadowColor = col; ctx.shadowBlur = 14;
+  ctx.beginPath(); ctx.ellipse(ax, ay, bw, bh, 0, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+  // scrolling marquee band on the flank
+  const segs = 9, sw = (bw * 1.5) / segs, scroll = Math.floor(t * 3);
+  for (let i = 0; i < segs; i++) {
+    const sx = ax - bw * 0.75 + i * sw + 2;
+    const on = ((i + scroll) % 3) !== 0;
+    ctx.globalAlpha = on ? 0.85 : 0.18;
+    ctx.fillStyle = on ? `hsl(${(hue + i * 14) % 360},92%,68%)` : '#22304f';
+    ctx.fillRect(sx, ay - 6, sw - 3, 12);
+  }
+  // blinking belly beacon
+  ctx.globalAlpha = 0.4 + 0.5 * Math.abs(Math.sin(t * 3));
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(ax, ay + bh, 2.4, 0, TAU); ctx.fill();
   ctx.restore();
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
