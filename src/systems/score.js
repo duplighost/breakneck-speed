@@ -160,6 +160,22 @@ export function sparkScore() {
   state.save.sparks = (state.save.sparks || 0) + 1;
 }
 
+// ── Per-room STYLE RANK: a character-action grade at clear. Rewards exactly the
+// breakneck play — a fat combo, a flawless room, skill moves (PERFECT dismounts, air
+// tricks, grind chains, counted in run.roomStyle), and a swift clear. S is rare. ──
+const GRADE_TIERS = [[7.5, 'S'], [5.5, 'A'], [3.5, 'B'], [1.5, 'C']];
+export function roomGrade(room) {
+  const run = state.run; if (!run) return 'C';
+  let s = 0;
+  s += Math.min(3.0, Math.max(0, (run.combo || 1) - 1) * 0.6); // a fat combo
+  s += run.player?.roomHit ? 0 : 2.0;                          // flawless room
+  s += Math.min(2.5, (run.roomStyle || 0) * 0.4);              // skill moves
+  const tt = room.time || 0;                                   // swift clear
+  s += tt < 20 ? 1.0 : tt < 34 ? 0.5 : 0;
+  for (const [t, g] of GRADE_TIERS) if (s >= t) return g;
+  return 'D';
+}
+
 export function roomClearScore(room) {
   const run = state.run;
   let total = Math.floor((SCORE.CLEAR_BASE + run.round * SCORE.CLEAR_PER_ROUND) * run.combo);

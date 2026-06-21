@@ -5,7 +5,7 @@ import { state, newRun, bankBests, saveNow } from '../state.js';
 import { dist } from '../rng.js';
 import { rollRoom } from './roomRoller.js';
 import { makePlayer } from './player.js';
-import { roomClearScore } from './score.js';
+import { roomClearScore, roomGrade } from './score.js';
 import { vacuumSparks } from './pickups.js';
 import { wavesDone } from './director.js';
 import { addFloat, burst, ripple } from '../render/particles.js';
@@ -56,6 +56,7 @@ function applyRoom(room) {
   p._dashCutPrimed = false; p._dashFrameActive = false; p._lastX = p.x; p._lastY = p.y; p._dashLastX = p.x; p._dashLastY = p.y;
   p.inv = Math.max(p.inv, 0.9);
   p.roomHit = false;
+  state.run.roomStyle = 0; // skill-move tally for this room's STYLE RANK
   p.after.length = 0;
   suppressInput(160);
   snapCamera();
@@ -119,6 +120,15 @@ export function clearRoom(room) {
   ripple(room, p.x, p.y, room.biome.pal.accent2, 320, 0.5);
   addFloat(room, p.x, p.y - 96, 'STAGE CLEAR', '#ffffff', true, 1.25);
   addFloat(room, p.x, p.y - 60, '↯ dash the rail home', room.biome.pal.accent2, false, 1.1);
+  // STYLE RANK — a character-action grade on how you cleared. Chase the S.
+  const grade = roomGrade(room);
+  const gcol = { S: '#fff1a8', A: '#7df9ff', B: '#7efab7', C: '#ffd36e', D: '#9eb0cc' }[grade] || '#fff';
+  addFloat(room, p.x, p.y - 134, `RANK ${grade}`, gcol, true, grade === 'S' ? 1.8 : 1.4);
+  if (grade === 'S' || grade === 'A') {
+    ripple(room, p.x, p.y, gcol, grade === 'S' ? 300 : 220, grade === 'S' ? 0.7 : 0.5);
+    sfx('perfect');
+    if (grade === 'S') { addFlash(0.32); state.save.lifetime.sRanks = (state.save.lifetime.sRanks || 0) + 1; }
+  }
   for (let i = 0; i < 50; i++) {
     const a = (i / 50) * Math.PI * 2, rr = 40 + Math.random() * 170;
     burst(room, room.portal.x, room.portal.y, room.biome.pal.accent3, 1, rr * 1.7, 0.85, 3);

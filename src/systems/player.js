@@ -426,6 +426,7 @@ function airTrick(p, room, a) {
   const far = dist(a.sx, a.sy, a.ex, a.ey) > 720;
   const name = far ? 'DOUBLE BACKFLIP!' : 'BACKFLIP!';
   run.score += Math.floor(95 * (run.combo || 1) * (far ? 2 : 1));
+  run.roomStyle = (run.roomStyle || 0) + (far ? 2 : 1); // STYLE RANK credit
   addRedline(far ? 0.08 : 0.05);
   addFloat(room, p.x, p.y - 60, name, '#ffd36e', true, far ? 1.0 : 0.82);
   ripple(room, p.x, p.y, '#ffd36e', far ? 140 : 110, 0.42);
@@ -537,6 +538,7 @@ function onGrindLatch(p, room) {
   const n = run._grindChain;
   if (n >= 2) {
     run.score += Math.floor(70 * n * (run.combo || 1));
+    run.roomStyle = (run.roomStyle || 0) + 1; // STYLE RANK credit
     addRedline(0.05 + n * 0.02);
     addFloat(room, p.x, p.y - 56, `GRIND CHAIN ×${n}`, '#ffce5a', true, 0.7 + Math.min(0.55, n * 0.07));
     sfx('grindChain'); addShake(0.1);
@@ -553,6 +555,7 @@ function perfectGrindBonus(p, room) {
   const n = run._grindChain || 1;
   const pts = Math.floor(140 * (run.combo || 1) * (1 + n * 0.15));
   run.score += pts;
+  run.roomStyle = (run.roomStyle || 0) + 2; // counts toward the room's STYLE RANK
   addRedline(0.16);
   p.flowT = Math.max(p.flowT || 0, 0.55);
   addFloat(room, p.x, p.y - 66, 'PERFECT!', '#7df9ff', true, 1.05);
