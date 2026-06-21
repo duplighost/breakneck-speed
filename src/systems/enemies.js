@@ -318,7 +318,7 @@ export function makeMiniBoss(def, room, x, y) {
 export function spawnMiniBoss(room, def, x, y) {
   const e = makeMiniBoss(def, room, x, y);
   room.enemies.push(e);
-  slowMo(0.3); addFlash(0.3); addShake(0.55); sfx('telegraph');
+  slowMo(0.3); addFlash(0.3); addShake(0.55); sfx('elite');
   ripple(room, x, y, e.color, 210, 0.75); ripple(room, x, y, '#ffffff', 130, 0.5);
   burst(room, x, y, e.color, 34, 380, 0.7, 4.4);
   addFloat(room, x, y - e.r - 36, '⚠ ELITE: ' + def.title.toUpperCase(), '#ffd36e', true, 1.25);

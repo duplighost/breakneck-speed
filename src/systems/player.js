@@ -105,9 +105,11 @@ export function updatePlayer(p, move, aim, room, dt) {
     return;
   }
   if (updateRailRide(p, room, move, dt)) {
+    p._wasRailing = true;
     finishPlayerFrame(p, room, Math.hypot(p.vx, p.vy), dt, true);
     return;
   }
+  if (p._wasRailing) { p._wasRailing = false; if (state.run) state.run._lastGrindExit = room.time || 0; }
 
   // ground surface under the boots (Moonless-inspired): slick lets you DRIFT (almost no
   // friction), tar DRAGS you (a dash glides over it), charge plates SHOVE you along and
@@ -507,10 +509,27 @@ function pointToRailS(room, p, x, y) {
   return B.w + B.h + B.w + (B.b - clamp(y, B.t, B.b));
 }
 
+// Grind chaining: hopping from one rail to the next within a beat builds a GRIND CHAIN —
+// escalating bonus score + flow-surge charge + a callout. Rewards stringing the rooftops
+// together (the spider-man flow). _lastGrindExit is stamped when you leave a rail.
+function onGrindLatch(p, room) {
+  const run = state.run; if (!run) return true;
+  const now = room.time || 0;
+  run._grindChain = (now - (run._lastGrindExit ?? -99) < 1.1) ? (run._grindChain || 0) + 1 : 1;
+  const n = run._grindChain;
+  if (n >= 2) {
+    run.score += Math.floor(70 * n * (run.combo || 1));
+    addRedline(0.05 + n * 0.02);
+    addFloat(room, p.x, p.y - 56, `GRIND CHAIN ×${n}`, '#ffce5a', true, 0.7 + Math.min(0.55, n * 0.07));
+    sfx('grindChain'); addShake(0.1);
+  }
+  return true;
+}
+
 function maybeLatchRail(p, room, x0 = p.x, y0 = p.y, startLevel = p.level || 0) {
   if (p.rail?.active || p.air || (p._railLatchCd || 0) > 0) return false;
-  if (tryLatchEscapeRail(p, room, x0, y0)) return true; // victory-lap express wins priority
-  if (tryLatchSkyRail(p, room, x0, y0, startLevel)) return true;
+  if (tryLatchEscapeRail(p, room, x0, y0)) return onGrindLatch(p, room); // victory-lap express wins priority
+  if (tryLatchSkyRail(p, room, x0, y0, startLevel)) return onGrindLatch(p, room);
   if (!room.edgeRail) return false;
   const B = railBounds(room, p);
   const near = Math.min(Math.abs(p.x - B.l), Math.abs(p.x - B.r), Math.abs(p.y - B.t), Math.abs(p.y - B.b));
@@ -528,7 +547,7 @@ function maybeLatchRail(p, room, x0 = p.x, y0 = p.y, startLevel = p.level || 0) 
   p.x = info.x; p.y = info.y; p.level = 0;
   ripple(room, p.x, p.y, room.biome.pal.accent2, 92, 0.35);
   addFloat(room, p.x, p.y - 46, '↯', room.biome.pal.accent2, false, 0.42);
-  return true;
+  return onGrindLatch(p, room);
 }
 
 function tryLatchSkyRail(p, room, x0, y0, startLevel = p.level || 0) {

@@ -235,13 +235,25 @@ export function buildWaves(room, rng) {
 function maybeRollMiniBoss(room, rng) {
   if (room.bossId || room.round < 3 || !MINIBOSSES.length) return;
   const idx = room.idx;
+  const spot = () => ({
+    mx: clamp(room.w * rand(rng, 0.28, 0.72), room.wall + 200, room.w - room.wall - 200),
+    my: clamp(room.h * rand(rng, 0.26, 0.5), room.wall + 200, room.h - room.wall - 200),
+  });
+  // ELITE RUSH: a rare gauntlet of 2-3 mini-bosses, staggered in (deeper rounds only).
+  if (room.round >= 6 && chance(rng, idx >= 7 ? 0.16 : 0.09)) {
+    room._eliteRush = true;
+    const count = randi(rng, 2, 3);
+    for (let i = 0; i < count; i++) {
+      const def = MINIBOSSES[Math.floor(rng() * MINIBOSSES.length)];
+      const s = spot();
+      room.pendingWaves.push({ at: 3.0 + i * 2.4, orWhenLeft: i === 0 ? 1 : 0, fired: false, miniboss: def, mx: s.mx, my: s.my, rush: i === 0 });
+    }
+    return;
+  }
   const chanceMB = idx <= 1 ? 0 : idx <= 4 ? 0.34 : idx <= 7 ? 0.42 : 0.5;
   if (!chance(rng, (chanceMB + (room.mutator?.eliteBonus || 0)))) return;
-  const def = MINIBOSSES[Math.floor(rng() * MINIBOSSES.length)];
-  // a spot toward the upper-middle of the city, clear of the low spawn corner
-  const mx = clamp(room.w * rand(rng, 0.34, 0.66), room.wall + 200, room.w - room.wall - 200);
-  const my = clamp(room.h * rand(rng, 0.28, 0.5), room.wall + 200, room.h - room.wall - 200);
-  room.pendingWaves.push({ at: rand(rng, 3.4, 5.6), orWhenLeft: 1, fired: false, miniboss: def, mx, my });
+  const s = spot();
+  room.pendingWaves.push({ at: rand(rng, 3.4, 5.6), orWhenLeft: 1, fired: false, miniboss: MINIBOSSES[Math.floor(rng() * MINIBOSSES.length)], mx: s.mx, my: s.my });
 }
 
 export function applyCaptain(e, affix) {
@@ -269,6 +281,7 @@ export function tickDirector(room, dt) {
     if (!due) continue;
     wave.fired = true;
     if (wave.miniboss) {
+      if (wave.rush) addFloat(room, room.w / 2, room.wall + 96, 'ELITE RUSH', '#ff5d6c', true, 1.7);
       spawnMiniBoss(room, wave.miniboss, wave.mx, wave.my);
     } else if (wave.spawns) {
       for (const s of wave.spawns) spawnTelegraphed(room, s.type, s.x, s.y, DIRECTOR.TELEGRAPH + s.delay, s.captain);

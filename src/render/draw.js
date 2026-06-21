@@ -67,6 +67,7 @@ export function drawFrame() {
   drawEdgeRail(room, pal, p);
   drawTiers(room, pal);
   drawHoloAds(room, pal);        // giant animated holographic billboards on the towers
+  drawDistrictHolos(room, pal, p); // floating neighborhood-name holograms
   drawSurfaces(room, pal, 1);    // rooftop surfaces, drawn onto the platform tops
   drawSkyRails(room, pal, p);
   drawOffRoutes(room, pal, p);
@@ -194,7 +195,7 @@ export function drawFrame() {
     ctx.restore();
   }
   drawEclipse(room); // False Moon's eclipse darkens the field around the moon
-  if (room.weather === 'rain') drawRain(pal); // neon rain over the rain-slicked districts
+  if (room.weather === 'rain') drawRain(room, pal); // neon rain + lightning over rain-slicked districts
   if (state.mode === 'play') drawSpeedStreaks(p); // anime speed-lines at dash/flow velocity
   if (p && state.mode === 'play') drawDangerTriangles(room, p);
   if (room.portal) drawPortalArrow(room);
@@ -237,6 +238,38 @@ function drawTiers(room, pal) {
     if (t.x + t.w < vis.l || t.x > vis.r || t.y + t.h < vis.t || t.y - roofLift(t) > vis.b) continue;
     drawBuilding(room, pal, t);
   }
+}
+
+// Floating neighborhood-name holograms: each city block announces itself with a glitchy
+// holographic sign that brightens as you cross into it — the sprawl reads as real places.
+function drawDistrictHolos(room, pal, p) {
+  if (reduced() || state.lowFx) return;
+  const t = room.time || performance.now() / 1000;
+  const vis = visibleRect(120);
+  for (const d of room.districts || []) {
+    if (!d.name) continue;
+    const cx = d.cx, cy = d.cy;
+    if (cx < vis.l || cx > vis.r || cy < vis.t || cy > vis.b) continue;
+    const near = p ? Math.hypot(p.x - cx, p.y - cy) : 9999;
+    const prox = clamp(1 - near / 920, 0, 1);
+    if (prox < 0.06) continue;
+    const glitch = Math.sin(t * 33 + d.phase) > 0.93 ? 0.3 : 1; // occasional flicker
+    const flick = (0.78 + 0.22 * Math.sin(t * 9 + d.phase)) * glitch;
+    const col = d.color || pal.accent2, y = cy - 64;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.textAlign = 'center'; ctx.shadowColor = col;
+    ctx.shadowBlur = 12; ctx.globalAlpha = 0.42 * prox * flick; ctx.fillStyle = col;
+    ctx.font = '800 27px Inter, system-ui, sans-serif';
+    ctx.fillText(d.name.toUpperCase(), cx, y);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 0.32 * prox * flick; ctx.fillStyle = '#cfe6ff';
+    ctx.font = '600 13px Inter, system-ui, sans-serif';
+    ctx.fillText(`${(d.kind || 'city').toUpperCase()} DISTRICT`, cx, y + 18);
+    ctx.globalAlpha = 0.5 * prox; ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 96, y + 27); ctx.lineTo(cx + 96, y + 27); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 
 // Giant animated holographic billboards on the tower faces — the iconic neon-city ad blitz.
@@ -1181,9 +1214,26 @@ function drawOuterSkyline(room, pal) {
 
 // Neon rain: two parallax layers of slanted glowing streaks (screen-space), plus a faint
 // cool mood wash. Pairs with the wet-street building reflections for full cyberpunk drizzle.
-function drawRain(pal) {
+function drawRain(room, pal) {
   if (reduced() || state.lowFx) return;
   const tt = performance.now() / 1000, W = view.W, H = view.H;
+  // ── lightning: a periodic strike — white flash + a forked bolt (thunder plays in main) ──
+  const period = 9, ph = (room.time || 0) % period;
+  if (ph < 0.5) {
+    const idx = Math.floor((room.time || 0) / period);
+    const inten = (ph < 0.08 ? ph / 0.08 : Math.max(0, 1 - (ph - 0.08) / 0.42)) * (0.5 + 0.5 * hsh(idx * 5.1));
+    if (inten > 0.02) {
+      ctx.save();
+      ctx.fillStyle = `rgba(210,225,255,${(inten * 0.45).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = '#eaf2ff'; ctx.shadowColor = '#bcd4ff'; ctx.shadowBlur = 18;
+      ctx.globalAlpha = inten; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      let bx = (0.2 + hsh(idx * 3.1) * 0.6) * W, by = 0;
+      ctx.beginPath(); ctx.moveTo(bx, by);
+      while (by < H * 0.66) { by += 30 + hsh(idx + by) * 46; bx += (hsh(idx * 2 + by) - 0.5) * 90; ctx.lineTo(bx, by); }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
   ctx.save();
   // cool mood wash
   ctx.globalAlpha = 0.06; ctx.fillStyle = '#3a4a78'; ctx.fillRect(0, 0, W, H);

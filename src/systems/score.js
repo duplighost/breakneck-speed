@@ -90,7 +90,7 @@ function igniteRedline() {
   addFlash(0.4); addShake(0.72);
   ripple(room, p.x, p.y, '#ff5d6c', 290, 0.72); ripple(room, p.x, p.y, '#ffffff', 170, 0.5);
   burst(room, p.x, p.y, '#ff5d6c', 42, 470, 0.7, 5.2);
-  sfx('clear'); sfx('pulse');
+  sfx('redline');
 }
 export function tickRedline(raw) {
   const run = state.run; if (!run) return;

@@ -56,6 +56,14 @@ export function sfx(kind) {
     case 'draft': note(440, 0.08, 'triangle', 0.04); note(660, 0.1, 'triangle', 0.03, 0.07); break;
     case 'portal': note(294, 0.12, 'sine', 0.045); note(440, 0.14, 'sine', 0.04, 0.08); note(587, 0.16, 'sine', 0.03, 0.16); break;
     case 'telegraph': note(180, 0.05, 'square', 0.02); break;
+    // REDLINE ignite — a rising power surge
+    case 'redline': noise(0.12, 0.06); note(220, 0.1, 'sawtooth', 0.05); note(330, 0.12, 'sawtooth', 0.045, 0.06); note(523, 0.16, 'square', 0.04, 0.12); note(880, 0.2, 'sine', 0.03, 0.2); break;
+    // mini-boss arrival — an ominous low horn
+    case 'elite': note(70, 0.3, 'sawtooth', 0.06); note(105, 0.34, 'square', 0.04, 0.05); note(140, 0.4, 'sawtooth', 0.03, 0.1); noise(0.2, 0.04); break;
+    // grind chain — a quick rising arpeggio
+    case 'grindChain': note(659, 0.05, 'triangle', 0.035); note(880, 0.06, 'triangle', 0.03, 0.04); note(1175, 0.08, 'sine', 0.025, 0.08); break;
+    // thunder — a deep rumble crack
+    case 'thunder': noise(0.5, 0.08); note(55, 0.5, 'sawtooth', 0.05); note(40, 0.7, 'sine', 0.04, 0.08); break;
   }
 }
 

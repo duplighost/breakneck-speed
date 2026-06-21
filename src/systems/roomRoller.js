@@ -1534,6 +1534,7 @@ function seedDistricts(room, rng, px, py, portalX, portalY) {
         id: id++, x, y, w, h, cx, cy,
         kind: pick(rng, DISTRICT_KIND),
         color: `hsl(${hue}, 86%, 64%)`,
+        name: `${pick(rng, DISTRICT_PREFIX)} ${pick(rng, DISTRICT_CORE)}`, // floating holo sign
         phase: rng() * TAU,
         gridC: c, gridR: r,
       });

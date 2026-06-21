@@ -142,6 +142,10 @@ export function step(raw) {
       updateParticles(room, raw);
       tickCombo(raw);
       tickRedline(raw);
+      if (room.weather === 'rain') { // thunder, a beat after each lightning strike
+        const bi = Math.floor(((room.time || 0) - 0.35) / 9);
+        if (bi >= 0 && bi !== room._thunderIdx) { room._thunderIdx = bi; sfx('thunder'); }
+      }
       updateRound(dt);
       updateCamera(dt);
       break;
