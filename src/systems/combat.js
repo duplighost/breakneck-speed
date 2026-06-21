@@ -154,6 +154,27 @@ function grantMinibossReward(room, p, e) {
   p.dashCd = 0;
   p.flowT = Math.max(p.flowT || 0, 0.5);
   p.inv = Math.max(p.inv || 0, 0.3);
+  // ELITE RUSH payoff: beating the whole gauntlet (no elites left, none still queued)
+  // pays a fat bonus + a full heal on top of the per-kill rewards.
+  if (room._eliteRush && !room._eliteRushDone) {
+    const moreElites = room.enemies.some(x => x.miniboss && x.hp > 0 && x !== e)
+      || (room.pendingWaves || []).some(w => w.miniboss && !w.fired);
+    if (!moreElites) { room._eliteRushDone = true; eliteRushComplete(room, p); }
+  }
+}
+
+function eliteRushComplete(room, p) {
+  const run = state.run;
+  const bonus = 1500 + (run?.round || 1) * 250;
+  if (run) run.score += bonus;
+  p.hp = Math.min(p.maxHp + 4, p.hp + 3);          // full-ish heal as the gauntlet payoff
+  p.flowT = Math.max(p.flowT || 0, 0.8);
+  addFloat(room, p.x, p.y - 92, 'ELITE RUSH CLEAR', '#ff5d6c', true, 1.7);
+  addFloat(room, p.x, p.y - 58, `+${bonus.toLocaleString()}`, '#ffd36e', true, 1.1);
+  addFlash(0.4); addShake(0.7); slowMo(0.12);
+  ripple(room, p.x, p.y, '#ff5d6c', 320, 0.8); ripple(room, p.x, p.y, '#ffffff', 200, 0.55);
+  burst(room, p.x, p.y, '#ff5d6c', 46, 480, 0.8, 5.2);
+  sfx('redline'); sfx('clear');
 }
 
 // Kill-chain crescendo. Consecutive kills inside a short window stack a counter; each

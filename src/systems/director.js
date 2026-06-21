@@ -243,8 +243,10 @@ function maybeRollMiniBoss(room, rng) {
   if (room.round >= 6 && chance(rng, idx >= 7 ? 0.16 : 0.09)) {
     room._eliteRush = true;
     const count = randi(rng, 2, 3);
+    const pool = MINIBOSSES.slice();             // draw DISTINCT elites for the gauntlet
     for (let i = 0; i < count; i++) {
-      const def = MINIBOSSES[Math.floor(rng() * MINIBOSSES.length)];
+      const def = pool.length ? pool.splice(Math.floor(rng() * pool.length), 1)[0]
+        : MINIBOSSES[Math.floor(rng() * MINIBOSSES.length)];
       const s = spot();
       room.pendingWaves.push({ at: 3.0 + i * 2.4, orWhenLeft: i === 0 ? 1 : 0, fired: false, miniboss: def, mx: s.mx, my: s.my, rush: i === 0 });
     }
