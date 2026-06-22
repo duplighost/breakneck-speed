@@ -90,14 +90,22 @@ export function updatePlayer(p, move, aim, room, dt) {
   // plays through the arc — otherwise it unwinds to upright the moment you're free.
   if (!p.rail?.active && !p.air) p.grindSpin = damp(p.grindSpin || 0, 0, 9, dt);
 
-  // aim + auto-fire: the gun never stops. Manual aim wins; with no manual aim, lock
-  // onto the nearest enemy so you keep shooting without aiming (constant flow state).
+  // aim + auto-fire: the gun never stops. Manual aim wins; with no manual aim, lock onto
+  // the nearest enemy you can actually hit. If enemies are around but none are hittable
+  // from here (e.g. all up on a roof above you), keep firing where you're heading so shots
+  // always come out — the gun going silent felt like a bug.
   let firing = false;
   if (aim.active) {
     p.aimX = aim.x; p.aimY = aim.y; firing = true;
   } else if (!room.cleared) {
     const tgt = nearestEnemy(room, p);
-    if (tgt) { const n = norm(tgt.x - p.x, tgt.y - p.y); p.aimX = n.x; p.aimY = n.y; firing = true; }
+    if (tgt) {
+      const n = norm(tgt.x - p.x, tgt.y - p.y); p.aimX = n.x; p.aimY = n.y; firing = true;
+    } else if (room.enemies.some(e => e.hp > 0 && !e.offRoute)) {
+      const sp = Math.hypot(p.vx, p.vy);
+      if (sp > 40) { p.aimX = p.vx / sp; p.aimY = p.vy / sp; } // aim where you're running
+      firing = true;
+    }
   }
   p.face = Math.atan2(p.aimY, p.aimX);
   if (firing && p.fireCd <= 0) firePlayer(p, room);
@@ -880,7 +888,9 @@ function nearestEnemy(room, p) {
   let best = null, bd = Infinity;
   const lv = p.level || 0;
   for (const e of room.enemies) {
-    if (e.hp <= 0 || e.offRoute || (e.level || 0) !== lv) continue; // off-route sentinels are a dash gauntlet
+    // off-route sentinels are a dash gauntlet; and you can't shoot UP onto higher ground
+    // (matches the bullet level rule), but same-or-lower enemies are fair game.
+    if (e.hp <= 0 || e.offRoute || (e.level || 0) > lv) continue;
     const dx = e.x - p.x, dy = e.y - p.y, d = dx * dx + dy * dy;
     if (d < bd) { bd = d; best = e; }
   }
