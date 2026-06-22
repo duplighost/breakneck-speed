@@ -610,10 +610,18 @@ function tryLatchSkyRail(p, room, x0, y0, startLevel = p.level || 0) {
       // off-routes: the UNDERGROUND latches from the street (lv 0); the SKYWAY from a roof
       if (r.route.kind === 'under' ? lv !== 0 : (startLevel < 1 || lv < 1)) continue;
     } else {
-      if (startLevel < 1 || lv < 1 || (r.level || 1) !== lv) continue; // floor dashes pass under normal sky rails
+      // spiral/climb rails can be grabbed from the street (you grind UP them); plain sky
+      // rails still need you to already be on a roof so floor dashes pass under them.
+      if (!(r.spiral || r.climb) && (startLevel < 1 || lv < 1 || (r.level || 1) !== lv)) continue;
     }
-    const d = segmentSegmentDist(x0, y0, p.x, p.y, r.x1, r.y1, r.x2, r.y2);
-    const info = pointSegmentInfo(p.x, p.y, r.x1, r.y1, r.x2, r.y2);
+    let d, info;
+    if (r.bow || r.spiral) {            // curved rails: sample the actual path, not the chord
+      info = nearestRailU(r, p.x, p.y);
+      d = info.d;
+    } else {
+      d = segmentSegmentDist(x0, y0, p.x, p.y, r.x1, r.y1, r.x2, r.y2);
+      info = pointSegmentInfo(p.x, p.y, r.x1, r.y1, r.x2, r.y2);
+    }
     const width = (r.width || 36) + p.r + 12;
     if (d > width && info.d > width) continue;
     const score = Math.min(d, info.d);
@@ -634,6 +642,18 @@ function tryLatchSkyRail(p, room, x0, y0, startLevel = p.level || 0) {
 
 function skyRailPoint(r, u) {
   u = clamp(u, 0, 1);
+  if (r.spiral) {
+    // Helix wrapping a tower: the footprint loops around (cx,cy) at radius rad while the
+    // ride climbs (variable lift, applied in draw). Parametric, so the grind follows it
+    // exactly. Tangent is the analytic derivative so the player faces along the climb.
+    const W = r.dirSign * r.turns * TAU;
+    const ang = r.a0 + W * u;
+    const x = r.cx + Math.cos(ang) * r.rad;
+    const y = r.cy + Math.sin(ang) * r.rad;
+    const s = Math.sign(W) || 1;
+    const tx = -Math.sin(ang) * s, ty = Math.cos(ang) * s;
+    return { x, y, tx, ty, nx: -ty, ny: tx, u, len: r.arcLen || (r.turns * TAU * r.rad) };
+  }
   const dx = r.x2 - r.x1, dy = r.y2 - r.y1;
   const len = Math.hypot(dx, dy) || 1;
   if (!r.bow) {
@@ -653,6 +673,19 @@ function skyRailPoint(r, u) {
   let ty = dy + cny * r.bow * Math.PI * k * c;
   const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
   return { x, y, tx, ty, nx: -ty, ny: tx, u, len };
+}
+
+// Nearest point on a curved/spiral rail: sample the parametric path (the chord is
+// meaningless for a helix or a deep bow) and return the closest u + its tangent.
+function nearestRailU(r, px, py) {
+  let bu = 0, bd = Infinity, N = r.spiral ? 40 : 22;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, q = skyRailPoint(r, u);
+    const dd = (q.x - px) * (q.x - px) + (q.y - py) * (q.y - py);
+    if (dd < bd) { bd = dd; bu = u; }
+  }
+  const q = skyRailPoint(r, bu);
+  return { t: bu, cx: q.x, cy: q.y, lx: q.tx, ly: q.ty, d: Math.sqrt(bd) };
 }
 
 // ── Express escape rail (spawned on room clear, rooms.js spawnEscapeRail) ──

@@ -74,13 +74,18 @@ export function rollRoom(run, round) {
   }
   const sizeScale = mutator?.sizeScale || 1;
 
+  // ── the SPIRE DISTRICT: a vertical skyscraper playground — towers wrapped in spiral
+  // climb-rails, linked at the summit by sky-bridges. A rare, distinct place in the world.
+  const forceSpire = !!run._forceSpire; if (run) run._forceSpire = false;
+  const spire = !bossId && (forceSpire || (round >= 4 && chance(rng, 0.16)));
+
   const portrait = genMobile() && view.portrait;
   // Giant sprawl on desktop; phones pull the landscape size back (portrait stays modest).
   // Safe to go big: floor/lanes are viewport-culled and the enemy budget is already capped.
   const deviceScale = genMobile() ? (portrait ? 1 : 0.7) : 1;
   const room = {
     round, idx: depthIdx(round), stage: dangerStage(round, run.overdrive),
-    biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId,
+    biome, layoutId, recipeId, mutatorId: mutator?.id || null, mutator, eventId: null, bossId, spire,
     floorplanId: 'none', openings: [], sanctum: null, tiers: [], vents: [], setpieces: [],
     surfaces: [], escapeRail: null,
     districts: [], flowLanes: [], skyRails: [], skyways: [], offRoutes: [], rings: [], signs: [], traffic: [], waypoints: [], districtName: '', districtSubtitle: '', backgroundScale: 1,
@@ -185,6 +190,7 @@ export function rollRoom(run, round) {
   if (room.tiers.length) seedVents(room, rng, px, py, portalX, portalY);
   if (room.tiers.length) seedSkyRails(room, rng);
   if (room.skyRails.length) seedRailRings(room, rng);
+  if (room.spire && room.tiers.length >= 2) seedSpireDistrict(room, rng, px, py, portalX, portalY);
   if (!bossId && room.tiers.length) seedHighGroundRewards(room, rng);
   seedSurfaces(room, rng, px, py, portalX, portalY);
   seedDistrictLandmarks(room, rng, px, py, portalX, portalY);
@@ -903,6 +909,67 @@ function seedRailRings(room, rng) {
       const off = r.bow ? r.bow * Math.sin(u * Math.PI * k) : 0;
       room.rings.push({ id: id++, x: r.x1 + dx * u + cnx * off, y: r.y1 + dy * u + cny * off, level: r.level || 1, rise: r.rise || 1, taken: false, phase: rng() * TAU });
     }
+  }
+}
+
+// ── THE SPIRE DISTRICT ──────────────────────────────────────────────────────────────
+// Turn the biggest towers into skyscrapers and wrap each in a SPIRAL climb-rail that
+// winds up the outside (latch from the street, grind up and up). Link the summits with
+// straight sky-bridges so you can run tower-to-tower at altitude. Rings reward the climb;
+// an apex ring-cluster is the summit treasure. Pairs with the SPIRE WARDEN elite.
+function seedSpireDistrict(room, rng, px, py, portalX, portalY) {
+  // Pick a few big, well-separated towers with room for a spiral outside their footprint.
+  const pickAt = (spread) => {
+    const out = [];
+    for (const t of (room.tiers || []).slice().sort((a, b) => (b.w * b.h) - (a.w * a.h))) {
+      const cx = t.x + t.w / 2, cy = t.y + t.h / 2, maxHalf = Math.max(t.w, t.h) / 2;
+      const wallGap = Math.min(cx - room.wall, room.w - room.wall - cx, cy - room.wall, room.h - room.wall - cy) - 40;
+      if (wallGap < maxHalf + 70) continue;               // room for the spiral OUTSIDE the footprint
+      if (dist(cx, cy, px, py) < 680) continue;           // not right on top of spawn
+      if (out.some(c => dist(cx, cy, c.cx, c.cy) < spread)) continue; // spread the towers out
+      out.push({ tier: t, cx, cy, maxHalf, wallGap });
+      if (out.length >= 3) break;
+    }
+    return out;
+  };
+  let chosen = pickAt(1000);
+  if (chosen.length < 2) chosen = pickAt(600); // relax spread for sparse seeds
+  if (chosen.length < 2) return;
+
+  const spireRise = 5, liftEnd = TIER_LIFT * spireRise;   // skyscrapers — tall, so the climb reads big
+  let ringId = (room.rings.length || 0) + 5000;
+  for (const c of chosen) {
+    c.tier.rise = spireRise;                              // make the slab a skyscraper
+    c.tier.crown = 'mast';                                // a spire reads "tall"
+    const rad = clamp(c.maxHalf + 60, 130, c.wallGap);
+    const turns = 1.8, a0 = rng() * TAU, dirSign = rng() < 0.5 ? 1 : -1;
+    const W = dirSign * turns * TAU;
+    const baseX = c.cx + Math.cos(a0) * rad, baseY = c.cy + Math.sin(a0) * rad;
+    const topX = c.cx + Math.cos(a0 + W) * rad, topY = c.cy + Math.sin(a0 + W) * rad;
+    room.skyRails.push({
+      spiral: true, climb: true, cx: c.cx, cy: c.cy, rad, turns, a0, dirSign,
+      liftStart: 0, liftEnd, arcLen: turns * TAU * rad, level: 1, color: '#9fe8ff', width: 44,
+      boost: 2300, x1: baseX, y1: baseY, x2: topX, y2: topY, phase: rng() * TAU, // brisk-epic climb
+    });
+    c.top = { x: topX, y: topY };
+    const nRings = 8;                                     // rings strung UP the helix
+    for (let i = 1; i <= nRings; i++) {
+      const u = i / (nRings + 1), ang = a0 + W * u;
+      room.rings.push({ id: ringId++, x: c.cx + Math.cos(ang) * rad, y: c.cy + Math.sin(ang) * rad, level: 1, rise: spireRise * u, taken: false, phase: rng() * TAU, spire: true });
+    }
+  }
+  // sky-bridges linking the summits (straight sky rails at the summit height)
+  const tops = chosen.map(c => c.top);
+  const bridges = tops.length >= 3 ? tops.length : 1;     // 3 towers → a triangle; 2 → one span
+  for (let i = 0; i < bridges; i++) {
+    const a = tops[i], b = tops[(i + 1) % tops.length];
+    room.skyRails.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, rise: spireRise, level: 1, trunk: true, color: '#ffe6b0', width: 40, phase: rng() * TAU });
+  }
+  // summit treasure: a ring halo crowning the tallest tower
+  const apex = chosen[0].top;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TAU;
+    room.rings.push({ id: ringId++, x: apex.x + Math.cos(a) * 48, y: apex.y + Math.sin(a) * 48, level: 1, rise: spireRise, taken: false, phase: rng() * TAU, spire: true });
   }
 }
 

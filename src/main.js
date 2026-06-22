@@ -207,6 +207,15 @@ function installDebug(actions) {
       else { hideOverlays(); state.mode = 'play'; state.transition = null; beginRound(state.run.round + 1); }
       return window.oneRoomDebug.state();
     },
+    // force-roll the next room as a SPIRE DISTRICT (skyscrapers + spiral climb-rails)
+    spire: () => {
+      if (!state.run) startRun('spire');
+      state.run._forceSpire = true;
+      hideOverlays(); state.mode = 'play'; state.transition = null;
+      beginRound((state.run.round || 1) + 1);
+      const r = state.room;
+      return { spire: !!r?.spire, spirals: (r?.skyRails || []).filter(s => s.spiral).length, rings: (r?.rings || []).length };
+    },
     killAll: () => {
       const room = state.room;
       if (!room) return null;

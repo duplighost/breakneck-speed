@@ -70,6 +70,7 @@ export function drawFrame() {
   drawDistrictHolos(room, pal, p); // floating neighborhood-name holograms
   drawSurfaces(room, pal, 1);    // rooftop surfaces, drawn onto the platform tops
   drawSkyRails(room, pal, p);
+  drawClimbRails(room, pal, p);   // spiral rails winding up the spire-district towers
   drawRings(room, pal, p);        // collectible neon rings strung along the rails
   drawOffRoutes(room, pal, p);
   drawSkyLife(room, pal, p);      // flying vehicles + sweeping searchlights high over the city
@@ -104,7 +105,7 @@ export function drawFrame() {
   }
   if (p && !p.dead) {
     const rr = p.rail?.active && p.rail.kind === 'sky' ? p.rail.rail : null;
-    const baseLift = rr?.route ? skywayLift(rr, p.rail.u || 0)        // off-route: climbing height
+    const baseLift = (rr && (rr.route || rr.climb)) ? skywayLift(rr, p.rail.u || 0) // off-route OR spiral climb: rises along u
       : rr ? TIER_LIFT * (rr.rise || 1)                              // normal sky rail: ride at rail height
         : liftAt(room, p.x, p.y, p.level);                           // on foot / rooftop
     const pLift = baseLift + (p.airZ || 0);
@@ -625,7 +626,7 @@ function drawSkyRails(room, pal, p) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.globalCompositeOperation = 'lighter';
   for (const r of rails) {
-    if (r.route) continue; // off-routes (skyway/underground) leave the map — drawn by drawOffRoutes
+    if (r.route || r.spiral || r.climb) continue; // off-routes + spiral climbs drawn elsewhere
     const active = activeRail === r;
     // each rail rides at the height of the roofs it connects (second-layer; floor dashes ignore it)
     ctx.save();
@@ -653,6 +654,45 @@ function drawSkyRails(room, pal, p) {
     ctx.restore();
   }
   ctx.restore();
+}
+
+// Spiral climb-rails (the SPIRE DISTRICT): a helix that winds up a tower, rising as it
+// goes. Lift varies along u, so it's traced per-point (not the flat translate drawSkyRails
+// uses). Pairs with high straight sky-bridges (normal sky rails) linking the tower tops.
+function climbRailScreenPoint(r, u) {
+  u = clamp(u, 0, 1);
+  let x, y;
+  if (r.spiral) {
+    const ang = r.a0 + r.dirSign * r.turns * TAU * u;
+    x = r.cx + Math.cos(ang) * r.rad; y = r.cy + Math.sin(ang) * r.rad;
+  } else { x = r.x1 + (r.x2 - r.x1) * u; y = r.y1 + (r.y2 - r.y1) * u; }
+  return { x, y: y - skywayLift(r, u) };
+}
+function drawClimbRails(room, pal, p) {
+  const rails = (room.skyRails || []).filter(r => r.spiral || r.climb);
+  if (!rails.length) return;
+  const t = room.time || performance.now() / 1000;
+  const activeRail = p?.rail?.active && p.rail.kind === 'sky' ? p.rail.rail : null;
+  const vis = visibleRect(560);
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalCompositeOperation = 'lighter';
+  for (const r of rails) {
+    const base = climbRailScreenPoint(r, 0), top = climbRailScreenPoint(r, 1);
+    if (Math.max(base.x, top.x) < vis.l - 700 || Math.min(base.x, top.x) > vis.r + 700 ||
+        Math.max(base.y, top.y) < vis.t - 1100 || Math.min(base.y, top.y) > vis.b + 700) continue;
+    const active = activeRail === r;
+    const N = r.spiral ? 72 : 24, col = r.color || RAIL_GOLD;
+    const trace = () => { ctx.beginPath(); for (let i = 0; i <= N; i++) { const q = climbRailScreenPoint(r, i / N); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); } };
+    ctx.globalAlpha = active ? 0.40 : 0.20; ctx.strokeStyle = active ? '#ffffff' : col; ctx.lineWidth = active ? 17 : 12; trace(); ctx.stroke();
+    ctx.globalAlpha = active ? 0.92 : 0.52; ctx.strokeStyle = active ? '#ffffff' : col; ctx.lineWidth = active ? 4.6 : 3;
+    ctx.setLineDash([22, 16]); ctx.lineDashOffset = -t * (active ? 380 : 150); trace(); ctx.stroke(); ctx.setLineDash([]);
+    // base latch ring (street level — you grind UP from here) + summit cap
+    for (const [u, rad] of [[0, active ? 14 : 11], [1, 9]]) {
+      const q = climbRailScreenPoint(r, u);
+      ctx.globalAlpha = active ? 0.85 : 0.46; ctx.fillStyle = hexA(col, 0.4); ctx.strokeStyle = active ? '#ffffff' : col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(q.x, q.y, rad, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+  }
+  ctx.restore(); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 
 // ── Off-routes: special grind rails that leave the map to a jackpot jewel. The SKYWAY

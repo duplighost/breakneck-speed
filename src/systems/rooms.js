@@ -65,6 +65,10 @@ function applyRoom(room) {
     addFloat(room, room.w / 2, room.wall + 104, room.mutator.name, room.biome.pal.bad, true, 1.5);
     whisper(MUTATOR_LINES[room.mutator.id] || '');
   }
+  if (room.spire) {
+    addFloat(room, room.w / 2, room.wall + 104, '↑ THE SPIRE DISTRICT ↑', '#9fe8ff', true, 1.5);
+    whisper('Towers wound in light. Grind up — the sky-bridges link the peaks.');
+  }
   if (room.bossId) {
     const boss = room.enemies.find(e => e.boss);
     if (boss) addFloat(room, room.w / 2, room.wall + 110, boss.display.toUpperCase(), room.biome.pal.bad, true, 1.35);
