@@ -284,7 +284,9 @@ export function tickDirector(room, dt) {
     wave.fired = true;
     if (wave.miniboss) {
       if (wave.rush) addFloat(room, room.w / 2, room.wall + 96, 'ELITE RUSH', '#ff5d6c', true, 1.7);
-      spawnMiniBoss(room, wave.miniboss, wave.mx, wave.my);
+      if (wave.spireBoss) addFloat(room, room.w / 2, room.wall + 96, '⚠ SPIRE WARDEN — TAKE THE SUMMIT', '#9fe8ff', true, 1.5);
+      const mb = spawnMiniBoss(room, wave.miniboss, wave.mx, wave.my);
+      if (mb && wave.mLevel != null) mb.level = wave.mLevel; // perch the Warden up on the roof
     } else if (wave.spawns) {
       for (const s of wave.spawns) spawnTelegraphed(room, s.type, s.x, s.y, DIRECTOR.TELEGRAPH + s.delay, s.captain);
     } else if (wave.list?.length) {

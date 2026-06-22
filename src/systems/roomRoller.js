@@ -16,6 +16,7 @@ import { rollEvent } from './events.js';
 import { stacks } from './items.js';
 import { bossForRound } from './bosses.js';
 import { MUTATORS } from '../data/mutators.js';
+import { MINIBOSSES } from '../data/enemies.js';
 import { FLOORPLANS, FLOORPLAN_IDS } from '../data/floorplans.js';
 import { seedRoomShop } from './shop.js';
 
@@ -291,6 +292,7 @@ export function rollRoom(run, round) {
 
   // ── axis 4: waves ──
   buildWaves(room, rng);
+  if (room.spire) seedSpireEnemies(room, rng); // summit Warden + rooftop sentinels (needs pendingWaves)
 
   // ── axis 5: room event (the spice slot) ──
   rollEvent(room, rng);
@@ -938,20 +940,29 @@ function seedSpireDistrict(room, rng, px, py, portalX, portalY) {
 
   const spireRise = 5, liftEnd = TIER_LIFT * spireRise;   // skyscrapers — tall, so the climb reads big
   let ringId = (room.rings.length || 0) + 5000;
+  room._nextVentId = room._nextVentId || 1;
   for (const c of chosen) {
     c.tier.rise = spireRise;                              // make the slab a skyscraper
     c.tier.crown = 'mast';                                // a spire reads "tall"
     const rad = clamp(c.maxHalf + 60, 130, c.wallGap);
-    const turns = 1.8, a0 = rng() * TAU, dirSign = rng() < 0.5 ? 1 : -1;
+    const turns = 1.7, a0 = rng() * TAU, dirSign = rng() < 0.5 ? 1 : -1;
     const W = dirSign * turns * TAU;
     const baseX = c.cx + Math.cos(a0) * rad, baseY = c.cy + Math.sin(a0) * rad;
     const topX = c.cx + Math.cos(a0 + W) * rad, topY = c.cy + Math.sin(a0 + W) * rad;
     room.skyRails.push({
       spiral: true, climb: true, cx: c.cx, cy: c.cy, rad, turns, a0, dirSign,
       liftStart: 0, liftEnd, arcLen: turns * TAU * rad, level: 1, color: '#9fe8ff', width: 44,
-      boost: 2300, x1: baseX, y1: baseY, x2: topX, y2: topY, phase: rng() * TAU, // brisk-epic climb
+      boost: 2550, x1: baseX, y1: baseY, x2: topX, y2: topY, phase: rng() * TAU, // brisk-epic climb
     });
     c.top = { x: topX, y: topY };
+    // UPDRAFT: an express elevator at the tower base — launch straight up to the roof
+    // (an alternative to grinding the scenic spiral). Reuses the vent launcher.
+    room.vents.push({
+      id: room._nextVentId++, r: 58, kind: 'updraft', fromLevel: 0, toLevel: 1, flash: 0, spire: true,
+      x: clamp(c.cx, room.wall + 80, room.w - room.wall - 80),
+      y: clamp(c.tier.y + c.tier.h + 86, room.wall + 80, room.h - room.wall - 96),
+      toX: c.cx, toY: c.cy, phase: rng() * TAU,
+    });
     const nRings = 8;                                     // rings strung UP the helix
     for (let i = 1; i <= nRings; i++) {
       const u = i / (nRings + 1), ang = a0 + W * u;
@@ -970,6 +981,30 @@ function seedSpireDistrict(room, rng, px, py, portalX, portalY) {
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * TAU;
     room.rings.push({ id: ringId++, x: apex.x + Math.cos(a) * 48, y: apex.y + Math.sin(a) * 48, level: 1, rise: spireRise, taken: false, phase: rng() * TAU, spire: true });
+  }
+  // stash the summit geometry so seedSpireEnemies (after buildWaves) can perch the Warden
+  // + rooftop sentinels. The Warden sits on the tallest ROOF CENTRE (over the tier → correct
+  // height), not the spiral's edge-top.
+  room._spireTops = tops;
+  room._spireCenters = chosen.map(c => ({ x: c.cx, y: c.cy }));
+  room._spireApex = { x: chosen[0].cx, y: chosen[0].cy };
+}
+
+// Populate the spire's heights: a SPIRE WARDEN elite on the tallest roof (the capstone you
+// must climb to clear) and a perched turret on each other tower. Runs AFTER buildWaves so
+// room.pendingWaves exists (buildWaves replaces it).
+function seedSpireEnemies(room, rng) {
+  const centers = room._spireCenters || [], apex = room._spireApex;
+  if (!centers.length || !apex) return;
+  centers.forEach((c, i) => {
+    if (i === 0) return; // the tallest is the Warden's perch
+    room.spawnQueue.push({ type: i % 2 ? 'turret' : 'gunner', x: c.x, y: c.y, level: 1, at: 1.6 + i * 0.5, glyphAt: 0.3 });
+  });
+  const def = MINIBOSSES.find(m => m.id === 'spirewarden');
+  if (def && room.pendingWaves) {
+    // the capstone: appears once the rest of the room is nearly cleared (you've climbed
+    // and dealt with the rooftop sentinels), or after a long fallback timer.
+    room.pendingWaves.push({ at: 13, fired: false, orWhenLeft: 1, miniboss: def, mx: apex.x, my: apex.y, mLevel: 1, spireBoss: true });
   }
 }
 
