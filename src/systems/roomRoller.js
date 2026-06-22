@@ -839,6 +839,9 @@ function seedVents(room, rng, px, py, portalX, portalY) {
   };
   const tiers = [...(room.tiers || [])].sort((a, b) => (a.y + a.h * 0.5) - (b.y + b.h * 0.5));
   for (const t of tiers) {
+    // Fewer launchers: not every rooftop gets a vent — ramps and sky-rails still reach
+    // them. Keeps the city from constantly flinging you around; most climbs are deliberate.
+    if (!chance(rng, 0.58)) continue;
     const target = { x: t.x + t.w * rand(rng, 0.36, 0.64), y: t.y + t.h * rand(rng, 0.30, 0.56) };
     let placed = false;
     const candidates = [
@@ -847,17 +850,6 @@ function seedVents(room, rng, px, py, portalX, portalY) {
       { x: t.x + t.w + rand(rng, 126, 230), y: t.y + t.h * rand(rng, 0.35, 0.78), tag: 'right' },
       { x: t.x + t.w * rand(rng, 0.22, 0.78), y: t.y - rand(rng, 112, 220), tag: 'north' },
     ];
-    // On very large arenas, also seed a lane-facing launcher so the player can hit
-    // rooftops at speed from the city grid instead of hunting the one ramp.
-    if (room.flowLanes?.length) {
-      const lane = pick(rng, room.flowLanes);
-      const at = rand(rng, 0.18, 0.82);
-      candidates.unshift({
-        x: lane.x1 + (lane.x2 - lane.x1) * at + rand(rng, -90, 90),
-        y: lane.y1 + (lane.y2 - lane.y1) * at + rand(rng, -90, 90),
-        tag: 'lane',
-      });
-    }
     for (const c of candidates) {
       const x = clamp(c.x, room.wall + 105, room.w - room.wall - 105);
       const y = clamp(c.y, room.wall + 105, room.h - room.wall - 125);
@@ -869,11 +861,11 @@ function seedVents(room, rng, px, py, portalX, portalY) {
     }
     // Matching drop fans are exits, not traps: they sit away from the updraft landing
     // and they are forbidden to land near another vent origin.
-    if (placed && roomAreaScale(room) > 3.2 && chance(rng, 0.88)) {
+    if (placed && roomAreaScale(room) > 3.2 && chance(rng, 0.45)) {
       const fanX = clamp(t.x + t.w * rand(rng, 0.18, 0.82), t.x + 78, t.x + t.w - 78);
       const fanY = clamp(t.y + t.h * rand(rng, 0.68, 0.88), t.y + 72, t.y + t.h - 58);
-      const outX = clamp(t.ramp.x + rand(rng, -175, 175), room.wall + 126, room.w - room.wall - 126);
-      const outY = clamp(t.y + t.h + rand(rng, 250, 410), room.wall + 126, room.h - room.wall - 126);
+      const outX = clamp(t.ramp.x + rand(rng, -150, 150), room.wall + 126, room.w - room.wall - 126);
+      const outY = clamp(t.y + t.h + rand(rng, 190, 300), room.wall + 126, room.h - room.wall - 126);
       if (dist(fanX, fanY, target.x, target.y) > 180 && reach.has(outX, outY) && ventClear(room, outX, outY, 62)
         && landingClear(fanX, fanY, t.height, 138) && landingClear(outX, outY, 0, 154)) {
         addVent(fanX, fanY, outX, outY, 0, 'dropfan', t.height);

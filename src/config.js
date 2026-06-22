@@ -28,21 +28,21 @@ export const PLAYER = {
   // Small, fast bolts: drawBullets renders these as crisp glowing darts (not big lasers,
   // not specks). Snappier to fire and read than the old fat bolts.
   SHOT_R: 3.4, SHOT_LIFE: 1.14, TWIN_OFFSET: 6,
-  // Baseline shot homing — a faint nudge toward an enemy almost dead ahead (tight cone,
-  // short range, gentle curve). Deliberately light: aim still matters. The hunterMycelia
-  // relic stacks on top with full-circle tracking.
-  SHOT_HOMING_TURN: 1.2, SHOT_HOMING_RANGE: 420, SHOT_HOMING_CONE: 0.42,
+  // Baseline shot homing — a very faint nudge toward an enemy almost dead ahead (tight
+  // cone, short range, soft curve). Deliberately subtle: aim does the work. The
+  // hunterMycelia relic stacks on top with full-circle tracking.
+  SHOT_HOMING_TURN: 0.5, SHOT_HOMING_RANGE: 320, SHOT_HOMING_CONE: 0.62,
   // Art-space gun offsets. firePlayer multiplies these by DRAW_SCALE so bullets leave the shrunken muzzle.
   EMITTER_Y: -16, EMITTER_LEN: 32,
   CRIT: 0.03, CRIT_MULT: 1.8,
   // the dash is the centerpiece: long, far, invincible throughout, hits hard+wide.
   // Reach + glide carried over from the faster "good speed / big rooms" fork.
-  DASH_IMPULSE: 2880, DASH_DUR: 0.52, DASH_CD: 0.16, DASH_IFRAMES: 0.62,
+  DASH_IMPULSE: 2560, DASH_DUR: 0.44, DASH_CD: 0.16, DASH_IFRAMES: 0.62,
   DASH_GLIDE: 0.68, DASH_HIT_RANGE: 255, DASH_SWEEP_RANGE: 236, DASH_HIT_MULT: 1.75, DASH_KNOCK: 860,
   DASH_KILL_REFUND: 0.145,   // every kill feeds the dash loop a little
-  // Slight aim-assist: when you dash with an enemy roughly ahead, curve toward it.
-  // A touch stronger than before (you liked more homing) but still an assist, not auto-aim.
-  DASH_HOMING_RANGE: 640, DASH_HOMING_CONE: 0.5, DASH_HOMING_MAX: 0.48,
+  // Slight aim-assist: when you dash with an enemy almost dead ahead, curve gently toward
+  // it. Deliberately subtle — a small correction on a near-aligned dash, not a magnet.
+  DASH_HOMING_RANGE: 460, DASH_HOMING_CONE: 0.66, DASH_HOMING_MAX: 0.13,
   DASH_PRIME_MULT: 1.5, DASH_PRIME_PIERCE: 1, // "dash primes next shot" relic payload
   HURT_IFRAMES: 0.92, HURT_KNOCK: 370,
   PICKUP_RANGE: 138,
