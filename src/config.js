@@ -28,10 +28,10 @@ export const PLAYER = {
   // Small, fast bolts: drawBullets renders these as crisp glowing darts (not big lasers,
   // not specks). Snappier to fire and read than the old fat bolts.
   SHOT_R: 3.4, SHOT_LIFE: 1.14, TWIN_OFFSET: 6,
-  // Baseline shot homing — a very faint nudge toward an enemy almost dead ahead (tight
-  // cone, short range, soft curve). Deliberately subtle: aim does the work. The
-  // hunterMycelia relic stacks on top with full-circle tracking.
-  SHOT_HOMING_TURN: 0.5, SHOT_HOMING_RANGE: 320, SHOT_HOMING_CONE: 0.62,
+  // Baseline shot homing — barely-there. Only a whisper of correction for an enemy
+  // basically dead ahead and close; otherwise shots fly straight where aimed. The
+  // hunterMycelia relic stacks on top for players who actually want tracking.
+  SHOT_HOMING_TURN: 0.12, SHOT_HOMING_RANGE: 230, SHOT_HOMING_CONE: 0.82,
   // Art-space gun offsets. firePlayer multiplies these by DRAW_SCALE so bullets leave the shrunken muzzle.
   EMITTER_Y: -16, EMITTER_LEN: 32,
   CRIT: 0.03, CRIT_MULT: 1.8,
