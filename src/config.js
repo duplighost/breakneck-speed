@@ -37,8 +37,8 @@ export const PLAYER = {
   CRIT: 0.03, CRIT_MULT: 1.8,
   // the dash is the centerpiece: long, far, invincible throughout, hits hard+wide.
   // Reach + glide carried over from the faster "good speed / big rooms" fork.
-  DASH_IMPULSE: 2560, DASH_DUR: 0.44, DASH_CD: 0.16, DASH_IFRAMES: 0.62,
-  DASH_GLIDE: 0.68, DASH_HIT_RANGE: 255, DASH_SWEEP_RANGE: 236, DASH_HIT_MULT: 1.75, DASH_KNOCK: 860,
+  DASH_IMPULSE: 1850, DASH_DUR: 0.38, DASH_CD: 0.16, DASH_IFRAMES: 0.62,
+  DASH_GLIDE: 1.35, DASH_HIT_RANGE: 255, DASH_SWEEP_RANGE: 236, DASH_HIT_MULT: 1.75, DASH_KNOCK: 860,
   DASH_KILL_REFUND: 0.145,   // every kill feeds the dash loop a little
   // Slight aim-assist: when you dash with an enemy almost dead ahead, curve gently toward
   // it. Deliberately subtle — a small correction on a near-aligned dash, not a magnet.

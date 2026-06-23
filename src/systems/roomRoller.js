@@ -1055,7 +1055,7 @@ function seedSkyRails(room, rng) {
   // connector pass turns the upper layer into an actual network instead of islands.
   const far = [...pairs].sort((a, b) => b.d - a.d);
   add(far[0], true);
-  const maxRails = Math.min(genMobile() ? 11 : 28, pairs.length);
+  const maxRails = Math.min(genMobile() ? 8 : 16, pairs.length);
   const near = [...pairs].sort((a, b) => a.d - b.d);
   while (connected.size < tiers.length && room.skyRails.length < maxRails) {
     const bridge = near.find(p => !used.has(key(p.a, p.b)) && (connected.has(p.a.id) !== connected.has(p.b.id)));
