@@ -2012,6 +2012,11 @@ function drawBullets(room) {
     const sp = Math.hypot(b.vx, b.vy) || 1;
     const ux = b.vx / sp, uy = b.vy / sp;
     ctx.save();
+    // Lift the shot to its shooter's drawn height: a bullet fired on a rooftop (level 1)
+    // must leave the gun up top, not the street footprint below. Matches how the player
+    // and enemies are lifted (liftAt), so the muzzle lines up with where you stand.
+    const blift = liftAt(room, b.x, b.y, b.level || 0);
+    if (blift) ctx.translate(0, -blift);
 
     if (b.owner === 'player' && !b.converted) {
       // ── crisp laser dart (small + fast) ──
