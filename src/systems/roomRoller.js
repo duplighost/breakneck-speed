@@ -587,11 +587,11 @@ function seedVerticality(room, rng, px, py, portalX, portalY, partitioned) {
   // Fewer rooftop platforms than the website build: the second layer was a major source
   // of overlapping silhouettes. Still a real lattice (rails + high-ground routes), just
   // legible instead of a stacked thicket.
-  const cap = room.bossId ? (genMobile() ? 5 : 8) : genMobile() ? (partitioned ? 7 : 8) : (partitioned ? 15 : 19);
+  const cap = room.bossId ? (genMobile() ? 5 : 8) : genMobile() ? (partitioned ? 8 : 11) : (partitioned ? 21 : 28);
   let made = seedRooftopGrid(room, rng, px, py, portalX, portalY, partitioned, cap);
   const target = room.bossId
     ? clamp(genMobile() ? 3 : 5, 3, cap)
-    : clamp((partitioned ? 6 : 8) + (room.idx >= 4 ? 1 : 0) + (room.idx >= 7 && !genMobile() ? 1 : 0), genMobile() ? 5 : 7, cap);
+    : clamp((partitioned ? 13 : 19) + (room.idx >= 4 ? 1 : 0) + (room.idx >= 7 && !genMobile() ? 1 : 0), genMobile() ? 8 : 13, cap);
   for (let tries = 0; room.tiers.length < target && tries < cap * 4; tries++) {
     if (maybeTier(room, rng, px, py, portalX, portalY, { smaller: tries > 0, partitioned, dense: true, fullMap: true })) made++;
   }
@@ -709,7 +709,7 @@ function tryPlaceTierRect(room, rng, px, py, portalX, portalY, rawRect, opts = {
   const pad = opts.partitioned ? 110 : 150;
   const hit = (qx, qy, extra = 0) => qx > tx - pad - extra && qx < tx + tw + pad + extra && qy > ty - pad - extra && qy < ty + th + pad + extra;
   if (hit(px, py, 80) || hit(portalX, portalY, 70)) return false;
-  if (room.tiers.some(t => rectOverlap(rect, t, opts.ordered ? 60 : 104))) return false;
+  if (room.tiers.some(t => rectOverlap(rect, t, opts.ordered ? 44 : 74))) return false;
   if (nearProtectedFlowLane(room, { type: 'rect', x: tx, y: ty, w: tw, h: th }, opts.ordered ? -86 : -48, opts.ordered ? 'tierCore' : 'tier')) return false;
 
   // ramp on the bottom edge: because spawn is low in the room, this keeps roof access
@@ -1733,25 +1733,20 @@ function seedFlowLanes(room, rng, px, py, portalX, portalY) {
 
   // The city should always have an obvious high-speed grid. These are not walls;
   // they are readable boost roads that keep the player moving instead of searching.
-  const hBands = room.bossId ? [0.30, 0.52, 0.72] : [0.20, 0.34, 0.50, 0.66, 0.80];
+  // Fewer ground roads — the upper layer (rooftops) is the playground now, not the street.
+  // Keep a sparse cross so the city still reads as a city and you can rejoin speed, but
+  // most traversal is meant to happen up top.
+  const hBands = room.bossId ? [0.34, 0.66] : [0.30, 0.68];
   for (const f of hBands) {
     const y = clampY(room.h * f + rand(rng, -58, 58));
     add(wall + rand(rng, 0, 70), y, room.w - wall - rand(rng, 0, 70), y + rand(rng, -65, 65), rand(rng, 116, 166), rand(rng, 560, 720), chance(rng, 0.5) ? pal.accent : pal.accent3);
   }
-  const vBands = room.bossId ? [0.34, 0.52, 0.68] : [0.18, 0.32, 0.50, 0.68, 0.82];
+  const vBands = room.bossId ? [0.40, 0.62] : [0.32, 0.66];
   for (const f of vBands) {
     const x = clampX(room.w * f + rand(rng, -64, 64));
     add(x, wall + rand(rng, 0, 70), x + rand(rng, -70, 70), room.h - wall - rand(rng, 0, 70), rand(rng, 108, 158), rand(rng, 540, 700), chance(rng, 0.5) ? pal.accent2 : pal.accent3);
   }
-  // Inner loop: gives a fast circuit around the city so the player can always
-  // rejoin speed without turning around or slow-walking across blank space.
-  const lx = room.w * 0.16, rx = room.w * 0.84, ty = room.h * 0.22, by = room.h * 0.78;
-  add(lx, ty, rx, ty + rand(rng, -50, 50), 142, 720, pal.accent2, 'express');
-  add(rx, ty, rx + rand(rng, -50, 50), by, 142, 720, pal.accent3, 'express');
-  add(rx, by, lx, by + rand(rng, -50, 50), 142, 720, pal.accent, 'express');
-  add(lx, by, lx + rand(rng, -50, 50), ty, 142, 720, pal.accent3, 'express');
-
-  const diagonals = room.bossId ? 2 : 4;
+  const diagonals = room.bossId ? 1 : 2;
   for (let i = 0; i < diagonals; i++) {
     const leftStart = chance(rng, 0.5);
     add(leftStart ? wall : room.w - wall, rand(rng, room.h * 0.20, room.h * 0.42),
