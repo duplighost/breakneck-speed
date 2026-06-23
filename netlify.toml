@@ -1,0 +1,7 @@
+# Breakneck Speed is a no-bundler static game — there is nothing to compile. The
+# "build" simply assembles the deployable files (entry HTML + JS module graph + art +
+# cache headers) into dist/ and publishes that, so a deploy never drags in the repo's
+# dev folders (_extracted test artifacts, _original source zips).
+[build]
+  command = "rm -rf dist && mkdir -p dist && cp index.html _headers dist/ && cp -r src assets dist/"
+  publish = "dist"
